@@ -270,7 +270,21 @@ export async function rejectSubmission(submissionId: string, reason: string) {
   const supabase = getSupabase();
   await supabase.from("payment_submissions").update({ status: "rejected", rejection_reason: reason }).eq("id", submissionId);
 }
-
+/** GET (staff) list of cash submissions awaiting approval — students land
+ *  here after submit-manual sets status to "under_review". Joins in the
+ *  student's name/ID so staff aren't approving a bare reference number
+ *  blind. */
+export async function getPendingCashSubmissions() {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from("payment_submissions")
+    .select("id, mtec_reference, amount, provider_reference, created_at, students(student_id, full_name)")
+    .eq("method", "cash_deposit")
+    .eq("status", "under_review")
+    .order("created_at", { ascending: true });
+  if (error) throw new Error(`getPendingCashSubmissions failed: ${error.message}`);
+  return data;
+}
 /** Called from the webhook's payment_code.expired handler. Only touches a
  *  submission that's still "pending" — if it's already verified (a
  *  completed event arrived first or raced ahead of the expiry event) or
