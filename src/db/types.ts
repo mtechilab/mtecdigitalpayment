@@ -120,6 +120,30 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["receipts"]["Row"]>;
         Relationships: [];
       };
+      admin_accounts: {
+        Row: { id: string; username: string; password_hash: string; full_name: string; role: string; created_at: string };
+        Insert: Partial<Database["public"]["Tables"]["admin_accounts"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["admin_accounts"]["Row"]>;
+        Relationships: [];
+      };
+      courses: {
+        Row: { id: string; code: string; name: string; programme: string; level: string; semester: string; credit_units: number };
+        Insert: Partial<Database["public"]["Tables"]["courses"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["courses"]["Row"]>;
+        Relationships: [];
+      };
+      marks: {
+        Row: { id: string; assessment_item_id: string; class_id: string; student_row_id: string; score: number };
+        Insert: Partial<Database["public"]["Tables"]["marks"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["marks"]["Row"]>;
+        Relationships: [];
+      };
+      result_batches: {
+        Row: { class_id: string; status: string; sent_back_reason: string | null; submitted_at: string | null; published_at: string | null };
+        Insert: Partial<Database["public"]["Tables"]["result_batches"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["result_batches"]["Row"]>;
+        Relationships: [];
+      };
       processed_webhook_events: {
         Row: { event_id: string; processed_at: string };
         Insert: Partial<Database["public"]["Tables"]["processed_webhook_events"]["Row"]>;
