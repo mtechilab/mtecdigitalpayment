@@ -1,12 +1,14 @@
 import { Router, Request, Response } from "express";
 import { loginAdmin, setupFirstAdmin, changeAdminPassword } from "../services/adminAuthService.js";
 import { getDashboardSummary } from "../services/adminDashboardService.js";
-import { listApplications, getApplication, approveApplication, rejectApplication } from "../services/adminApplicationsService.js";
+import { listApplications, getApplication, approveApplication, rejectApplication, addStudentDirect } from "../services/adminApplicationsService.js";
 import { getPendingSubmissions, finalizeVerifiedPayment, rejectSubmission } from "../services/paymentPlanService.js";
 import { listStudents, getStudentDetail } from "../services/adminStudentsService.js";
 import { listTransactions } from "../services/adminTransactionsService.js";
 import { listFeeStructures } from "../services/adminFeeStructuresService.js";
 import { getThread, sendMessage, listThreadsNeedingReply } from "../services/chatService.js";
+import { createCourse } from "../services/adminCoursesService.js";
+import { createPaymentPlan } from "../services/paymentPlanCreationService.js";
 import { requireAdminAuth, AdminRequest } from "../middleware/adminAuth.js";
 
 const router = Router();
@@ -245,6 +247,69 @@ router.post("/chat/:studentRowId", async (req: AdminRequest, res: Response) => {
   } catch (err) {
     console.error("[/admin/chat/:studentRowId POST] error:", (err as Error).message);
     res.status(500).json({ error: "Could not send message." });
+  }
+});
+
+// POST /admin/students — direct "walk-in" registration, no prior application
+router.post("/students", async (req: AdminRequest, res: Response) => {
+  try {
+    const { fullName, phone, email, programme, academicYear } = req.body as {
+      fullName?: string; phone?: string; email?: string; programme?: string; academicYear?: string;
+    };
+    if (!fullName || !phone || !programme || !academicYear) {
+      return res.status(400).json({ error: "fullName, phone, programme, and academicYear are required." });
+    }
+    const result = await addStudentDirect({ fullName, phone, email: email || "", programme, academicYear });
+    res.json({ success: true, studentId: result.studentId, pin: result.pin });
+  } catch (err) {
+    console.error("[/admin/students POST] error:", (err as Error).message);
+    res.status(500).json({ error: "Could not register student." });
+  }
+});
+
+// POST /admin/courses
+router.post("/courses", async (req: AdminRequest, res: Response) => {
+  try {
+    const { code, name, programme, level, semester, creditUnits } = req.body as {
+      code?: string; name?: string; programme?: string; level?: string; semester?: string; creditUnits?: number;
+    };
+    if (!code || !name || !programme || !level || !semester || !creditUnits) {
+      return res.status(400).json({ error: "code, name, programme, level, semester, and creditUnits are all required." });
+    }
+    const course = await createCourse({ code, name, programme, level, semester, creditUnits });
+    res.json({ success: true, courseId: course.id });
+  } catch (err) {
+    console.error("[/admin/courses POST] error:", (err as Error).message);
+    res.status(500).json({ error: "Could not create course." });
+  }
+});
+
+// POST /admin/students/:id/payment-plan — for a student with no active plan
+// (newly-admitted students already get one automatically — see admitStudent()
+// in adminApplicationsService.ts; this is for anyone who doesn't have one).
+router.post("/students/:id/payment-plan", async (req: AdminRequest, res: Response) => {
+  try {
+    const { label, frequency, totalAmount, periodCount, startDate } = req.body as {
+      label?: string; frequency?: "daily" | "weekly" | "monthly" | "semester";
+      totalAmount?: number; periodCount?: number; startDate?: string;
+    };
+    if (!label || !frequency || !totalAmount || !periodCount || !startDate) {
+      return res.status(400).json({ error: "label, frequency, totalAmount, periodCount, and startDate are all required." });
+    }
+    const result = await createPaymentPlan({
+      studentRowId: req.params.id, label, frequency, totalAmount, periodCount, startDate,
+    });
+    if (result.outcome === "student_not_found") return res.status(404).json({ error: "Student not found." });
+    if (result.outcome === "programme_not_found") {
+      return res.status(422).json({ error: `No programme record named "${result.programme}" — add it under Programmes first.` });
+    }
+    if (result.outcome === "plan_already_exists") {
+      return res.status(409).json({ error: "This student already has an active payment plan." });
+    }
+    res.json({ success: true, planId: result.planId });
+  } catch (err) {
+    console.error("[/admin/students/:id/payment-plan] error:", (err as Error).message);
+    res.status(500).json({ error: "Could not create payment plan." });
   }
 });
 

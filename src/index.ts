@@ -9,6 +9,7 @@ import staffRoutes from "./routes/staffRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import studentRoutes from "./routes/studentRoutes.js";
 import studentInfoRoutes from "./routes/studentInfoRoutes.js";
+import applicationRoutes from "./routes/applicationRoutes.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -31,6 +32,7 @@ app.use("/api/staff", staffRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/student", studentRoutes);
 app.use("/api/student", studentInfoRoutes);
+app.use("/applications", applicationRoutes);
 
 // Bare-minimum cash-approval page — visit https://<this-host>/staff on any
 // phone/browser. No login of its own; it just asks for the staff key and

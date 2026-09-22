@@ -183,9 +183,21 @@ export interface Database {
           id: string; application_number: string | null; pin_id: string; status: string; full_name: string;
           phone: string; email: string; programme: string; academic_year: string; intake: string;
           study_mode: string; rejection_reason: string | null; created_at: string; submitted_at: string | null;
+          declaration_confirmed: boolean;
         };
         Insert: Partial<Database["public"]["Tables"]["applications"]["Row"]>;
         Update: Partial<Database["public"]["Tables"]["applications"]["Row"]>;
+        Relationships: [];
+      };
+      application_pins: {
+        Row: {
+          id: string; pin: string; password_hash: string | null; academic_year: string; intake: string;
+          status: string; source: string; applicant_name: string; applicant_phone: string;
+          applicant_email: string | null; programme_interest: string; payment_transaction_id: string | null;
+          issued_by: string | null; created_at: string; activated_at: string | null; used_at: string | null;
+        };
+        Insert: Partial<Database["public"]["Tables"]["application_pins"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["application_pins"]["Row"]>;
         Relationships: [];
       };
       fee_structures: {
