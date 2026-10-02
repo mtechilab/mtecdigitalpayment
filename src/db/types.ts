@@ -267,3 +267,4 @@ export interface Database {
     Functions: { [_ in never]: never };
   };
 }
+}
