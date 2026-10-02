@@ -1,5 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
-import { Database } from "./types.js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -7,15 +6,15 @@ function requireEnv(name: string): string {
   return value;
 }
 
-let cachedClient: ReturnType<typeof createClient<Database>> | null = null;
+let cachedClient: SupabaseClient<any, "public", any> | null = null;
 
 /** Lazily created so a missing env var only throws when actually used,
  *  not at import time (matters for tests and for clear startup behavior). */
-export function getSupabase() {
+export function getSupabase(): SupabaseClient<any, "public", any> {
   if (!cachedClient) {
     const url = requireEnv("SUPABASE_URL");
     const serviceRoleKey = requireEnv("SUPABASE_SERVICE_ROLE_KEY");
-    cachedClient = createClient<Database>(url, serviceRoleKey, {
+    cachedClient = createClient(url, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
   }
