@@ -148,7 +148,9 @@ export interface Database {
         Row: { id: string; course_id: string; instructor_name: string; academic_year: string; student_ids: string[]; courses?: { code: string; name: string; credit_units: number; semester: string } | null };
         Insert: Partial<Database["public"]["Tables"]["classes"]["Row"]>;
         Update: Partial<Database["public"]["Tables"]["classes"]["Row"]>;
-        Relationships: [];
+        Relationships: [
+          { foreignKeyName: "classes_course_id_fkey"; columns: ["course_id"]; isOneToOne: false; referencedRelation: "courses"; referencedColumns: ["id"] }
+        ];
       };
       timetable_slots: {
         Row: { id: string; class_id: string; day_of_week: string; start_time: string; end_time: string; room: string; classes?: { courses?: { code: string; name: string } | null } | null };
@@ -169,10 +171,74 @@ export interface Database {
         Relationships: [];
       };
       applications: {
-        Row: { id: string; application_number: string | null; pin_id: string; status: string; full_name: string };
+        Row: {
+          id: string;
+          application_number: string | null;
+          pin_id: string;
+          status: string;
+          full_name: string;
+          other_name: string;
+          gender: string;
+          date_of_birth: string;
+          nationality: string;
+          phone: string;
+          whatsapp: string;
+          email: string;
+          address: string;
+          district: string;
+          city_town: string;
+          academic_year: string;
+          intake: string;
+          programme: string;
+          study_mode: string;
+          education: unknown;
+          emergency_contact: unknown;
+          documents: unknown;
+          declaration_confirmed: boolean;
+          rejection_reason: string | null;
+          created_at: string;
+          submitted_at: string | null;
+        };
         Insert: Partial<Database["public"]["Tables"]["applications"]["Row"]>;
         Update: Partial<Database["public"]["Tables"]["applications"]["Row"]>;
         Relationships: [];
+      };
+      application_pins: {
+        Row: {
+          id: string;
+          pin: string;
+          password_hash: string | null;
+          academic_year: string;
+          intake: string;
+          status: string;
+          source: string;
+          applicant_name: string;
+          applicant_phone: string;
+          applicant_email: string | null;
+          programme_interest: string;
+          payment_transaction_id: string | null;
+          issued_by: string | null;
+          created_at: string;
+          activated_at: string | null;
+          used_at: string | null;
+        };
+        Insert: Partial<Database["public"]["Tables"]["application_pins"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["application_pins"]["Row"]>;
+        Relationships: [];
+      };
+      fee_structures: {
+        Row: { programme: string; registration_fee: number; tuition_per_semester: number };
+        Insert: Partial<Database["public"]["Tables"]["fee_structures"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["fee_structures"]["Row"]>;
+        Relationships: [];
+      };
+      chat_messages: {
+        Row: { id: string; student_row_id: string; sender_type: string; sender_name: string; message: string; created_at: string };
+        Insert: Partial<Database["public"]["Tables"]["chat_messages"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["chat_messages"]["Row"]>;
+        Relationships: [
+          { foreignKeyName: "chat_messages_student_row_id_fkey"; columns: ["student_row_id"]; isOneToOne: false; referencedRelation: "students"; referencedColumns: ["id"] }
+        ];
       };
       offer_letters: {
         Row: {
