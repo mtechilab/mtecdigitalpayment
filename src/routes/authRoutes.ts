@@ -1,9 +1,10 @@
 import { Router } from "express";
 import { studentLogin, completeFirstLogin } from "../services/authService.js";
+import { rateLimit } from "../middleware/rateLimit.js";
 
 const router = Router();
 
-router.post("/student-login", async (req, res) => {
+router.post("/student-login", rateLimit("student-login", 10, 15*60*1000), async (req, res) => {
   try {
     const { studentId, credential } = req.body;
     if (!studentId || !credential) {
@@ -31,7 +32,7 @@ router.post("/student-login", async (req, res) => {
   }
 });
 
-router.post("/student-first-login", async (req, res) => {
+router.post("/student-first-login", rateLimit("student-first-login", 10, 15*60*1000), async (req, res) => {
   try {
     const { studentId, newPassword } = req.body;
     if (!studentId || !newPassword || newPassword.length < 6) {

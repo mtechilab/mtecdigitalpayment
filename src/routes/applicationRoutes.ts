@@ -1,10 +1,11 @@
 import { Router, Request, Response } from "express";
 import { submitApplication } from "../services/applicationSubmissionService.js";
+import { rateLimit } from "../middleware/rateLimit.js";
 
 const router = Router();
 
 // POST /applications/submit — public, no auth (this IS the sign-up form)
-router.post("/submit", async (req: Request, res: Response) => {
+router.post("/submit", rateLimit("application-submit", 20, 60*60*1000), async (req: Request, res: Response) => {
   try {
     const { fullName, phone, email, programme, academicYear, intake, studyMode } = req.body as {
       fullName?: string; phone?: string; email?: string; programme?: string;

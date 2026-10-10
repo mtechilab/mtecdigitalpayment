@@ -29,11 +29,6 @@ function handle(fn: (studentRowId: string) => Promise<unknown>, label: string) {
   };
 }
 
-router.get("/receipts", handle(getReceipts, "receipts"));
-router.get("/profile", handle(getProfile, "profile"));
-router.get("/timetable", handle(getTimetable, "timetable"));
-router.get("/attendance", handle(getAttendance, "attendance"));
-router.get("/results", handle(getResults, "results"));
 router.get("/gpa", handle(getGpaSummary, "gpa"));
 
 // PDF stream, not JSON — can't go through handle()'s res.json() wrapper.
@@ -45,7 +40,6 @@ router.get("/result-slip", async (req: AuthenticatedRequest, res: Response) => {
     res.status(500).json({ error: (err as Error).message || "Could not generate result slip." });
   }
 });
-router.get("/letters", handle(getLetters, "letters"));
 
 // GET /student/chat — the student's own thread with staff
 router.get("/chat", async (req: AuthenticatedRequest, res: Response) => {

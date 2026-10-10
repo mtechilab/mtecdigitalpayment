@@ -14,7 +14,10 @@ export interface Database {
   public: {
     Tables: {
       programmes: {
-        Row: { id: string; name: string; department: string; duration_years: number; duration_label: string };
+        Row: {
+          id: string; name: string; department: string; duration_years: number; duration_label: string;
+          category: string; mode: string; description: string; intake_label: string;
+        };
         Insert: Partial<Database["public"]["Tables"]["programmes"]["Row"]>;
         Update: Partial<Database["public"]["Tables"]["programmes"]["Row"]>;
         Relationships: [];

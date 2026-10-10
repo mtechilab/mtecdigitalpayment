@@ -10,6 +10,7 @@ import adminRoutes from "./routes/adminRoutes.js";
 import studentRoutes from "./routes/studentRoutes.js";
 import studentInfoRoutes from "./routes/studentInfoRoutes.js";
 import applicationRoutes from "./routes/applicationRoutes.js";
+import programmeRoutes from "./routes/programmeRoutes.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -28,6 +29,7 @@ app.use((req, res, next) => {
 
 app.use("/auth", authRoutes);
 app.use("/applications", applicationRoutes);
+app.use("/programmes", programmeRoutes);
 app.use("/payments", paymentRoutes);
 app.use("/api/staff", staffRoutes);
 app.use("/api/admin", adminRoutes);

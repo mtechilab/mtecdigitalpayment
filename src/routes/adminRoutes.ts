@@ -5,6 +5,7 @@ import { requireAdminAuth, AdminRequest } from "../middleware/adminAuth.js";
 import { buildReport, REPORT_TYPES, ReportType } from "../services/reportsService.js";
 import { streamResultSlip } from "../services/resultSlipService.js";
 import { streamAcceptanceLetter } from "../services/offerLetterService.js";
+import { rateLimit } from "../middleware/rateLimit.js";
 import {
   listApplications, getApplication, approveApplication, rejectApplication,
   registerStudentDirect,
@@ -41,7 +42,7 @@ router.post("/setup", async (req: Request, res: Response) => {
 });
 
 // POST /admin/login — { username, password }
-router.post("/login", async (req: Request, res: Response) => {
+router.post("/login", rateLimit("admin-login", 10, 15*60*1000), async (req: Request, res: Response) => {
   const { username, password } = req.body as { username?: string; password?: string };
   if (!username || !password) return res.status(400).json({ error: "username and password are required." });
 

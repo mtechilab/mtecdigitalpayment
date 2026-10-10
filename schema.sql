@@ -176,7 +176,11 @@ create table programmes (
   name text not null unique,
   department text not null default '',
   duration_years numeric not null,       -- e.g. 2 — drives "Programme Duration: 2 Years" in the UI
-  duration_label text not null default '' -- optional override, e.g. "2 Years" vs "24 Months"
+  duration_label text not null default '', -- optional override, e.g. "2 Years" vs "24 Months"
+  category text not null default 'General',     -- public catalogue grouping (Technology / Business / ...)
+  mode text not null default 'Full-time',
+  description text not null default '',
+  intake_label text not null default ''
 );
 
 -- ---- Payment Plans (Watu-inspired student payment experience) ---------
