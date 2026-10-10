@@ -306,6 +306,7 @@ export async function getStudentDetail(studentRowId: string) {
 const FREQUENCY_STEP_DAYS: Record<string, number> = { daily: 1, weekly: 7, monthly: 30, semester: 182 };
 
 export interface CreatePaymentPlanInput {
+  programmeName?: string; // the programme chosen on the form; falls back to the student's stored text
   studentRowId: string;
   label: string;
   frequency: "daily" | "weekly" | "monthly" | "semester";
@@ -326,10 +327,15 @@ export async function createPaymentPlanForStudent(input: CreatePaymentPlanInput)
   if (studentError) throw new Error(`createPaymentPlanForStudent (student lookup) failed: ${studentError.message}`);
   if (!student) throw new Error("Student not found.");
 
-  const { data: programme, error: programmeError } = await supabase
-    .from("programmes").select("id").ilike("name", student.programme).maybeSingle();
-  if (programmeError) throw new Error(`createPaymentPlanForStudent (programme lookup) failed: ${programmeError.message}`);
-  if (!programme) throw new Error(`No programme record matches "${student.programme}" — check it's spelled exactly as in Programmes.`);
+  // The programme the admin chose on the form wins, validated against the
+  // master list. Without a choice, fall back to the student's stored text so
+  // older callers keep working.
+  const programme = await findProgrammeByName(input.programmeName || student.programme);
+  if (!programme) {
+    throw new Error(input.programmeName
+      ? `"${input.programmeName}" is not on the programme list — add it in Academic Setup first, or choose Other to add it.`
+      : `No programme record matches "${student.programme}" — choose the programme on the form.`);
+  }
 
   const stepDays = FREQUENCY_STEP_DAYS[input.frequency];
   const start = new Date(input.startDate);
@@ -353,6 +359,13 @@ export async function createPaymentPlanForStudent(input: CreatePaymentPlanInput)
     .select("id")
     .single();
   if (planError) throw new Error(`createPaymentPlanForStudent (plan) failed: ${planError.message}`);
+
+  // The plan now names this programme; keep the student record on the same
+  // canonical name so receipts, letters and fee lookups agree with the plan.
+  if (student.programme !== programme.name) {
+    const { error: syncError } = await supabase.from("students").update({ programme: programme.name }).eq("id", input.studentRowId);
+    if (syncError) console.error("[paymentPlan] could not sync student programme:", syncError.message);
+  }
 
   const baseAmount = Math.floor((input.totalAmount / input.periodCount) * 100) / 100;
   const remainder = Math.round((input.totalAmount - baseAmount * input.periodCount) * 100) / 100;

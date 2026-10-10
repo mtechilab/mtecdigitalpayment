@@ -199,8 +199,8 @@ router.post("/students", requireAdminAuth, async (req: AdminRequest, res: Respon
 // POST /admin/students/:id/payment-plan — { label, frequency, totalAmount, periodCount, startDate }
 router.post("/students/:id/payment-plan", requireAdminAuth, async (req: Request, res: Response) => {
   try {
-    const { label, frequency, totalAmount, periodCount, startDate } = req.body as {
-      label?: string; frequency?: string; totalAmount?: number; periodCount?: number; startDate?: string;
+    const { label, frequency, totalAmount, periodCount, startDate, programmeName } = req.body as {
+      label?: string; frequency?: string; totalAmount?: number; periodCount?: number; startDate?: string; programmeName?: string;
     };
     if (!label || !frequency || !totalAmount || !periodCount || !startDate) {
       return res.status(400).json({ error: "label, frequency, totalAmount, periodCount, and startDate are all required." });
@@ -209,7 +209,7 @@ router.post("/students/:id/payment-plan", requireAdminAuth, async (req: Request,
       return res.status(400).json({ error: "frequency must be one of: daily, weekly, monthly, semester." });
     }
     const result = await createPaymentPlanForStudent({
-      studentRowId: req.params.id, label, frequency: frequency as any,
+      studentRowId: req.params.id, label, frequency: frequency as any, programmeName,
       totalAmount: Number(totalAmount), periodCount: Number(periodCount), startDate,
     });
     res.json({ success: true, ...result });
