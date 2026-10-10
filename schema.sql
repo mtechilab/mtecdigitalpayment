@@ -398,3 +398,30 @@ end $$;
 
 -- processed_webhook_events is server-only (service role bypasses RLS
 -- anyway) — no anon policy needed, so anon has zero access to it.
+
+-- ---- Academic setup (migration 006) ----------------------------------
+create table academic_levels (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,
+  sort_order int not null default 100,
+  created_at timestamptz not null default now()
+);
+create table semesters (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,
+  sort_order int not null default 100,
+  created_at timestamptz not null default now()
+);
+create table programme_requests (
+  id uuid primary key default gen_random_uuid(),
+  programme_name text not null,
+  application_id uuid references applications(id),
+  status text not null default 'open' check (status in ('open', 'approved', 'rejected')),
+  created_at timestamptz not null default now()
+);
+create index idx_programme_requests_status on programme_requests (status);
+insert into academic_levels (name, sort_order) values ('Year 1', 1), ('Year 2', 2), ('Year 3', 3), ('Year 4', 4);
+insert into semesters (name, sort_order) values ('Semester 1', 1), ('Semester 2', 2);
+alter table academic_levels enable row level security;
+alter table semesters enable row level security;
+alter table programme_requests enable row level security;

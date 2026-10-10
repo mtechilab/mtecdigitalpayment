@@ -201,6 +201,24 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["fee_structures"]["Row"]>;
         Relationships: [];
       };
+      academic_levels: {
+        Row: { id: string; name: string; sort_order: number; created_at: string };
+        Insert: Partial<Database["public"]["Tables"]["academic_levels"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["academic_levels"]["Row"]>;
+        Relationships: [];
+      };
+      semesters: {
+        Row: { id: string; name: string; sort_order: number; created_at: string };
+        Insert: Partial<Database["public"]["Tables"]["semesters"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["semesters"]["Row"]>;
+        Relationships: [];
+      };
+      programme_requests: {
+        Row: { id: string; programme_name: string; application_id: string | null; status: string; created_at: string };
+        Insert: Partial<Database["public"]["Tables"]["programme_requests"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["programme_requests"]["Row"]>;
+        Relationships: [];
+      };
       chat_messages: {
         Row: { id: string; student_row_id: string; sender_type: string; sender_name: string; message: string; created_at: string; students?: { student_id: string; full_name: string } | null };
         Insert: Partial<Database["public"]["Tables"]["chat_messages"]["Row"]>;

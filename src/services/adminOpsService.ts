@@ -1,3 +1,4 @@
+import { findProgrammeByName, findLevelByName, findSemesterByName } from "./academicSetupService.js";
 import bcrypt from "bcryptjs";
 import { getSupabase } from "../db/supabaseClient.js";
 import { getPendingCashSubmissions, finalizeVerifiedPayment, rejectSubmission } from "./paymentPlanService.js";
@@ -439,6 +440,24 @@ export interface AddCourseInput {
 }
 
 export async function addCourse(input: AddCourseInput) {
+  // Every academic field must come from the managed lists (Academic Setup),
+  // and the stored value is the canonical master spelling, not what was typed.
+  const programme = await findProgrammeByName(input.programme);
+  if (!programme) throw new Error(`"${input.programme}" is not on the programme list — add it in Academic Setup first.`);
+  const level = await findLevelByName(input.level);
+  if (!level) throw new Error(`"${input.level}" is not a level in Academic Setup.`);
+  const semester = await findSemesterByName(input.semester);
+  if (!semester) throw new Error(`"${input.semester}" is not a semester in Academic Setup.`);
+  input.programme = programme.name;
+  input.level = level.name;
+  input.semester = semester.name;
+
+  const code = input.code.trim();
+  const { data: dupe, error: dupeErr } = await getSupabase()
+    .from("courses").select("id").ilike("code", code.replace(/[\\%_]/g, (c) => `\\${c}`)).eq("programme", programme.name).maybeSingle();
+  if (dupeErr) throw new Error(`addCourse (duplicate check) failed: ${dupeErr.message}`);
+  if (dupe) throw new Error(`A course with code ${code} already exists for ${programme.name}.`);
+
   const supabase = getSupabase();
   const { data, error } = await supabase
     .from("courses")

@@ -1,3 +1,4 @@
+import { getAcademicSetup, createProgramme, createLevel, createSemester, approveProgrammeRequest, rejectProgrammeRequest } from "../services/academicSetupService.js";
 import { Router, Request, Response } from "express";
 import { loginAdmin, setupFirstAdmin } from "../services/adminAuthService.js";
 import { getDashboardSummary, getRecentActivities } from "../services/adminDashboardService.js";
@@ -691,6 +692,81 @@ router.get("/reports/:type", requireAdminAuth, async (req: Request, res: Respons
   } catch (err) {
     console.error("[/admin/reports/:type] error:", (err as Error).message);
     res.status(500).json({ error: "Could not build report." });
+  }
+});
+
+// ==========================================================================
+// Academic setup — the masters every academic form picks from. "Other" in a
+// form calls the same create endpoints, which return the existing record
+// rather than duplicating it.
+// ==========================================================================
+
+// GET /admin/academic-setup — programmes, levels, semesters, open applicant requests
+router.get("/academic-setup", requireAdminAuth, async (_req: Request, res: Response) => {
+  try {
+    res.json(await getAcademicSetup());
+  } catch (err) {
+    console.error("[/admin/academic-setup GET] error:", (err as Error).message);
+    res.status(500).json({ error: "Could not load academic setup." });
+  }
+});
+
+// POST /admin/academic-setup/programmes — { name, durationYears, category?, department? }
+router.post("/academic-setup/programmes", requireAdminAuth, async (req: Request, res: Response) => {
+  try {
+    const { name, durationYears, category, department } = req.body as {
+      name?: string; durationYears?: number; category?: string; department?: string;
+    };
+    if (!name) return res.status(400).json({ error: "name is required." });
+    res.json(await createProgramme({ name, durationYears: Number(durationYears), category, department }));
+  } catch (err) {
+    console.error("[/admin/academic-setup/programmes POST] error:", (err as Error).message);
+    res.status(400).json({ error: (err as Error).message || "Could not save programme." });
+  }
+});
+
+// POST /admin/academic-setup/levels — { name }
+router.post("/academic-setup/levels", requireAdminAuth, async (req: Request, res: Response) => {
+  try {
+    const { name } = req.body as { name?: string };
+    if (!name) return res.status(400).json({ error: "name is required." });
+    res.json(await createLevel(name));
+  } catch (err) {
+    console.error("[/admin/academic-setup/levels POST] error:", (err as Error).message);
+    res.status(400).json({ error: (err as Error).message || "Could not save level." });
+  }
+});
+
+// POST /admin/academic-setup/semesters — { name }
+router.post("/academic-setup/semesters", requireAdminAuth, async (req: Request, res: Response) => {
+  try {
+    const { name } = req.body as { name?: string };
+    if (!name) return res.status(400).json({ error: "name is required." });
+    res.json(await createSemester(name));
+  } catch (err) {
+    console.error("[/admin/academic-setup/semesters POST] error:", (err as Error).message);
+    res.status(400).json({ error: (err as Error).message || "Could not save semester." });
+  }
+});
+
+// POST /admin/academic-setup/programme-requests/:id/approve — { durationYears, category?, department? }
+router.post("/academic-setup/programme-requests/:id/approve", requireAdminAuth, async (req: Request, res: Response) => {
+  try {
+    const { durationYears, category, department } = req.body as { durationYears?: number; category?: string; department?: string };
+    res.json(await approveProgrammeRequest(req.params.id, { durationYears: Number(durationYears), category, department }));
+  } catch (err) {
+    console.error("[/admin/academic-setup/programme-requests approve] error:", (err as Error).message);
+    res.status(400).json({ error: (err as Error).message || "Could not approve request." });
+  }
+});
+
+// POST /admin/academic-setup/programme-requests/:id/reject
+router.post("/academic-setup/programme-requests/:id/reject", requireAdminAuth, async (req: Request, res: Response) => {
+  try {
+    res.json(await rejectProgrammeRequest(req.params.id));
+  } catch (err) {
+    console.error("[/admin/academic-setup/programme-requests reject] error:", (err as Error).message);
+    res.status(400).json({ error: (err as Error).message || "Could not reject request." });
   }
 });
 

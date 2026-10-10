@@ -1,3 +1,4 @@
+import { recordProgrammeRequestIfUnknown } from "./academicSetupService.js";
 import { getSupabase } from "../db/supabaseClient.js";
 
 /** The schema's real pipeline is application_pins -> applications, pin_id
@@ -53,6 +54,10 @@ export async function submitApplication(input: SubmitApplicationInput) {
     .select("id, application_number")
     .single();
   if (appError) throw new Error(`submitApplication (application) failed: ${appError.message}`);
+
+  // A programme typed by an applicant that isn't on the list is queued for the
+  // admin. Never blocks the application — the helper swallows its own errors.
+  await recordProgrammeRequestIfUnknown(input.programme, application.id);
 
   return application;
 }
