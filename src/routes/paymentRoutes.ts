@@ -1,3 +1,5 @@
+import { getPaymentQuote } from "../services/paymentQuoteService.js";
+import { claimPaid } from "../services/paymentClaimService.js";
 import { Router, Response } from "express";
 import crypto from "crypto";
 import { AuthenticatedRequest, requireStudentAuth } from "../middleware/auth.js";
@@ -158,6 +160,30 @@ router.post("/submit-manual", async (req: AuthenticatedRequest, res: Response) =
   } catch (err) {
     console.error("[/payments/submit-manual] error:", (err as Error).message);
     res.status(500).json({ error: "Could not submit payment." });
+  }
+});
+
+// GET /payments/quote — what the student can pay at each frequency right now
+router.get("/quote", async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const quote = await getPaymentQuote(req.studentRowId!);
+    if (!quote) return res.status(404).json({ error: "No active payment plan." });
+    res.json(quote);
+  } catch (err) {
+    console.error("[/payments/quote] error:", (err as Error).message);
+    res.status(500).json({ error: "Could not load payment options." });
+  }
+});
+
+// POST /payments/claim-paid — the student says they've paid: Monime order number and/or screenshot
+router.post("/claim-paid", async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { mtecReference, providerReference, proofBase64, proofContentType } = req.body;
+    if (!mtecReference) return res.status(400).json({ error: "mtecReference is required." });
+    res.json(await claimPaid(req.studentRowId!, { mtecReference, providerReference, proofBase64, proofContentType }));
+  } catch (err) {
+    console.error("[/payments/claim-paid] error:", (err as Error).message);
+    res.status(400).json({ error: (err as Error).message || "Could not submit payment." });
   }
 });
 

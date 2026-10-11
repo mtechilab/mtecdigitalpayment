@@ -11,6 +11,9 @@ import {
 } from "../services/studentInfoService.js";
 import { getChatThread, sendStudentChatMessage } from "../services/adminOpsService.js";
 import { streamResultSlip } from "../services/resultSlipService.js";
+import { streamAcceptanceLetter } from "../services/offerLetterService.js";
+import { streamReceiptPdf } from "../services/receiptPdfService.js";
+import { getApplicationOutcome } from "../services/studentInfoService.js";
 import { getSupabase } from "../db/supabaseClient.js";
 import bcrypt from "bcryptjs";
 
@@ -92,6 +95,31 @@ router.post("/change-password", async (req: AuthenticatedRequest, res: Response)
   } catch (err) {
     console.error("[/student/change-password] error:", (err as Error).message);
     res.status(500).json({ error: "Could not change password." });
+  }
+});
+
+// GET /student/application-outcome — real admission status (replaces the portal's placeholder)
+router.get("/application-outcome", handle(getApplicationOutcome, "application-outcome"));
+
+// GET /student/acceptance-letter — the official PDF for the logged-in student
+router.get("/acceptance-letter", async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    await streamAcceptanceLetter(req.studentRowId as string, res);
+  } catch (err) {
+    console.error("[/student/acceptance-letter] error:", (err as Error).message);
+    if (!res.headersSent) res.status(400).json({ error: (err as Error).message || "Could not generate acceptance letter." });
+    else res.end();
+  }
+});
+
+// GET /student/receipts/:receiptNumber/pdf — one of this student's receipts as a PDF
+router.get("/receipts/:receiptNumber/pdf", async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    await streamReceiptPdf(req.studentRowId as string, req.params.receiptNumber, res);
+  } catch (err) {
+    console.error("[/student/receipts/pdf] error:", (err as Error).message);
+    if (!res.headersSent) res.status(404).json({ error: (err as Error).message || "Could not generate receipt." });
+    else res.end();
   }
 });
 

@@ -62,6 +62,8 @@ export interface Database {
       };
       payment_submissions: {
         Row: {
+          proof_path: string | null;
+          proof_uploaded_at: string | null;
           id: string;
           mtec_reference: string;
           payment_plan_id: string;

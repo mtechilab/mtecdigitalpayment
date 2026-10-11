@@ -204,7 +204,7 @@ create table payment_plans (
   student_row_id uuid not null references students(id),
   programme_id uuid not null references programmes(id),
   label text not null,                  -- e.g. "Semester 1"
-  frequency text not null check (frequency in ('daily','weekly','monthly','semester')),
+  frequency text not null check (frequency in ('daily','weekly','monthly','semester','yearly')),
   period_amount numeric not null,       -- amount due per period, e.g. 750 for monthly
   total_amount numeric not null,        -- sum across the whole plan, e.g. 3000
   plan_start_date date not null,
@@ -249,6 +249,8 @@ create table payment_submissions (
   verified_at timestamptz,
   rejection_reason text,
   created_at timestamptz not null default now()
+  proof_path text,
+  proof_uploaded_at timestamptz
 );
 create index idx_payment_submissions_plan on payment_submissions (payment_plan_id);
 create index idx_payment_submissions_student on payment_submissions (student_row_id);
@@ -425,3 +427,5 @@ insert into semesters (name, sort_order) values ('Semester 1', 1), ('Semester 2'
 alter table academic_levels enable row level security;
 alter table semesters enable row level security;
 alter table programme_requests enable row level security;
+
+insert into storage.buckets (id, name, public) values ('payment-proofs', 'payment-proofs', false) on conflict (id) do nothing;

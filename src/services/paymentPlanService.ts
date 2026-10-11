@@ -12,7 +12,7 @@ import { createRecurrentPaymentCode } from "./monimeClient.js";
 // breaks the app silently (org.json throws, caught, shown as a toast).
 // ---------------------------------------------------------------------
 
-export type Frequency = "daily" | "weekly" | "monthly" | "semester";
+export type Frequency = "daily" | "weekly" | "monthly" | "semester" | "yearly";
 export type SubmissionMethod = "monime" | "orange_money" | "orange_money_agent" | "cash_deposit" | "alternative_account";
 
 interface PeriodRow {
@@ -132,11 +132,12 @@ export async function getPayableOptionsForStudent(studentRowId: string) {
     weekly: (n) => (n === 1 ? "1 Week" : `${n} Weeks`),
     monthly: (n) => (n === 1 ? "1 Month" : `${n} Months`),
     semester: () => "Full Semester",
+    yearly: (n) => (n === 1 ? "1 Year" : `${n} Years`),
   };
 
   const options = [];
   let cumulativeAmount = 0;
-  const maxOptions = plan.frequency === "semester" ? 1 : Math.min(unpaid.length, 4); // cap at 4 chips, matches mockup
+  const maxOptions = plan.frequency === "semester" || plan.frequency === "yearly" ? 1 : Math.min(unpaid.length, 4); // cap at 4 chips, matches mockup
 
   for (let i = 0; i < maxOptions; i++) {
     const outstanding = Number(unpaid[i].amount_due) - Number(unpaid[i].amount_paid);
@@ -279,8 +280,7 @@ export async function getPendingCashSubmissions() {
   const supabase = getSupabase();
   const { data, error } = await supabase
     .from("payment_submissions")
-    .select("id, mtec_reference, amount, provider_reference, created_at, students(student_id, full_name)")
-    .eq("method", "cash_deposit")
+    .select("id, mtec_reference, amount, method, provider_reference, proof_path, created_at, students(student_id, full_name)")
     .eq("status", "under_review")
     .order("created_at", { ascending: true });
   if (error) throw new Error(`getPendingCashSubmissions failed: ${error.message}`);

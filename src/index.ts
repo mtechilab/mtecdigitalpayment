@@ -19,7 +19,7 @@ const app = express();
 // alone gets the unparsed buffer; every other route gets normal JSON.
 app.use("/api/payments", webhookRoutes);
 
-app.use(express.json());
+app.use(express.json({ limit: "8mb" })); // payment screenshots arrive as base64 JSON
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
   res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Staff-Token");

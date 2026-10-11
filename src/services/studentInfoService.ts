@@ -1,5 +1,10 @@
 import { getSupabase } from "../db/supabaseClient.js";
 
+/** Row shapes for the embedded-join results below. The typed client collapses
+ *  these to an empty type, so they're declared here and cast after the query. */
+interface ClassLite { id: string; course_id: string; instructor_name: string }
+interface AssessLite { id: string; name: string; max_score: number }
+
 export async function getReceipts(studentRowId: string) {
   const supabase = getSupabase();
   const { data, error } = await supabase
@@ -58,7 +63,7 @@ export async function getTimetable(studentRowId: string) {
     .in("class_id", classIds);
   if (error) throw new Error(`getTimetable failed: ${error.message}`);
 
-  const classById = new Map(classes.map((c) => [c.id, c]));
+  const classById = new Map<string, ClassLite>((classes as unknown as ClassLite[]).map((c) => [c.id, c]));
   return (slots || []).map((slot) => {
     const cls = classById.get(slot.class_id);
     const course = cls ? courseMap.get(cls.course_id) : undefined;
@@ -78,7 +83,7 @@ export async function getAttendance(studentRowId: string) {
   const supabase = getSupabase();
   const classes = await getEnrolledClasses(studentRowId);
   const courseMap = await getCourseNamesByIds(classes.map((c) => c.course_id));
-  const classById = new Map(classes.map((c) => [c.id, c]));
+  const classById = new Map<string, ClassLite>((classes as unknown as ClassLite[]).map((c) => [c.id, c]));
 
   const { data, error } = await supabase
     .from("attendance_records")
@@ -104,7 +109,7 @@ export async function getResults(studentRowId: string) {
 
   const classIds = classes.map((c) => c.id);
   const courseMap = await getCourseNamesByIds(classes.map((c) => c.course_id));
-  const classById = new Map(classes.map((c) => [c.id, c]));
+  const classById = new Map<string, ClassLite>((classes as unknown as ClassLite[]).map((c) => [c.id, c]));
 
   const { data: publishedBatches, error: batchError } = await supabase
     .from("result_batches")
@@ -128,7 +133,7 @@ export async function getResults(studentRowId: string) {
     ? await supabase.from("assessment_items").select("id, name, max_score").in("id", assessmentIds)
     : { data: [] as { id: string; name: string; max_score: number }[], error: null };
   if (assessError) throw new Error(`getResults (assessments) failed: ${assessError.message}`);
-  const assessmentById = new Map((assessments || []).map((a) => [a.id, a]));
+  const assessmentById = new Map<string, AssessLite>(((assessments || []) as unknown as AssessLite[]).map((a) => [a.id, a]));
 
   return (marks || []).map((m) => {
     const cls = classById.get(m.class_id);
@@ -250,34 +255,69 @@ export function percentageToGrade(pct: number): { gradePoint: number; letterGrad
   return { gradePoint: 0.0, letterGrade: "F" };
 }
 
+/** The admission letter, built from the student's own approved record. Letters
+ *  used to come from offer_letters / acceptance_letters, which nothing writes to,
+ *  so students never saw one. A student row exists only after approval, so its
+ *  presence is the letter. */
 export async function getLetters(studentRowId: string) {
   const supabase = getSupabase();
-  const { data: acceptance, error } = await supabase
-    .from("acceptance_letters")
-    .select("offer_letter_id, generated_at, student_id_number")
-    .eq("student_row_id", studentRowId);
+  const { data: student, error } = await supabase
+    .from("students")
+    .select("full_name, programme, academic_year, created_at")
+    .eq("id", studentRowId)
+    .maybeSingle();
   if (error) throw new Error(`getLetters failed: ${error.message}`);
-  if (!acceptance || acceptance.length === 0) return [];
+  if (!student) return [];
 
-  const offerIds = acceptance.map((a) => a.offer_letter_id);
-  const { data: offers, error: offerError } = await supabase
-    .from("offer_letters")
-    .select("id, student_name, programme, academic_year, admission_conditions, fees_amount, reporting_date, authorized_signatory")
-    .in("id", offerIds);
-  if (offerError) throw new Error(`getLetters (offers) failed: ${offerError.message}`);
-  const offerById = new Map((offers || []).map((o) => [o.id, o]));
+  const { data: plan } = await supabase
+    .from("payment_plans")
+    .select("total_amount")
+    .eq("student_row_id", studentRowId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
-  return acceptance.map((a) => {
-    const offer = offerById.get(a.offer_letter_id);
-    return {
-      generatedAt: a.generated_at,
-      studentName: offer?.student_name || "",
-      programme: offer?.programme || "",
-      academicYear: offer?.academic_year || "",
-      admissionConditions: offer?.admission_conditions || "",
-      feesAmount: offer?.fees_amount ?? 0,
-      reportingDate: offer?.reporting_date || "",
-      authorizedSignatory: offer?.authorized_signatory || "",
-    };
-  });
+  return [{
+    generatedAt: student.created_at,
+    studentName: student.full_name,
+    programme: student.programme,
+    academicYear: student.academic_year,
+    admissionConditions: "",
+    feesAmount: plan ? Number(plan.total_amount) : 0,
+    reportingDate: "",
+    authorizedSignatory: "",
+  }];
+}
+
+/** Real admission status for the portal. approvedOn is the student record's
+ *  creation time: approval is what creates that row, so it's the approval moment. */
+export async function getApplicationOutcome(studentRowId: string) {
+  const supabase = getSupabase();
+  const { data: student, error: studentError } = await supabase
+    .from("students")
+    .select("student_id, programme, academic_year, application_id, created_at")
+    .eq("id", studentRowId)
+    .maybeSingle();
+  if (studentError) throw new Error(`getApplicationOutcome (student) failed: ${studentError.message}`);
+  if (!student) throw new Error("Student not found.");
+
+  const { data: app, error: appError } = await supabase
+    .from("applications")
+    .select("application_number, status, rejection_reason, intake, study_mode")
+    .eq("id", student.application_id)
+    .maybeSingle();
+  if (appError) throw new Error(`getApplicationOutcome (application) failed: ${appError.message}`);
+
+  return {
+    status: app?.status || "approved",
+    applicationNumber: app?.application_number || "",
+    programme: student.programme,
+    academicYear: student.academic_year,
+    intake: app?.intake || "",
+    studyMode: app?.study_mode || "",
+    approvedOn: student.created_at,
+    rejectionReason: app?.rejection_reason || null,
+    letterId: `MTEC-LET-${student.student_id}`,
+    letterAvailable: true,
+  };
 }

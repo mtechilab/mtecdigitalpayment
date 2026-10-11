@@ -1,3 +1,4 @@
+import { getProofForAdmin } from "../services/paymentClaimService.js";
 import { getAcademicSetup, createProgramme, createLevel, createSemester, approveProgrammeRequest, rejectProgrammeRequest } from "../services/academicSetupService.js";
 import { Router, Request, Response } from "express";
 import { loginAdmin, setupFirstAdmin } from "../services/adminAuthService.js";
@@ -254,6 +255,17 @@ router.get("/payments/pending", requireAdminAuth, async (_req: Request, res: Res
   } catch (err) {
     console.error("[/admin/payments/pending] error:", (err as Error).message);
     res.status(500).json({ error: "Could not load pending payments." });
+  }
+});
+
+// GET /admin/payments/:id/proof — the student's screenshot, for the admin to check
+router.get("/payments/:id/proof", requireAdminAuth, async (req: Request, res: Response) => {
+  try {
+    const { bytes, contentType } = await getProofForAdmin(req.params.id);
+    res.setHeader("Content-Type", contentType);
+    res.send(bytes);
+  } catch (err) {
+    res.status(404).json({ error: (err as Error).message || "No screenshot for this payment." });
   }
 });
 

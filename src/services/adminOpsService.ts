@@ -1,3 +1,4 @@
+import { FREQUENCY_STEP_DAYS } from "./paymentQuote.js";
 import { findProgrammeByName, findLevelByName, findSemesterByName } from "./academicSetupService.js";
 import bcrypt from "bcryptjs";
 import { getSupabase } from "../db/supabaseClient.js";
@@ -303,13 +304,13 @@ export async function getStudentDetail(studentRowId: string) {
  * name typo, or registered before fee_structures had that programme).
  * ========================================================================== */
 
-const FREQUENCY_STEP_DAYS: Record<string, number> = { daily: 1, weekly: 7, monthly: 30, semester: 182 };
+
 
 export interface CreatePaymentPlanInput {
   programmeName?: string; // the programme chosen on the form; falls back to the student's stored text
   studentRowId: string;
   label: string;
-  frequency: "daily" | "weekly" | "monthly" | "semester";
+  frequency: "daily" | "weekly" | "monthly" | "semester" | "yearly";
   totalAmount: number;
   periodCount: number;
   startDate: string; // YYYY-MM-DD
@@ -394,6 +395,7 @@ function periodLabel(frequency: string, index: number, dueDate: Date): string {
     return dueDate.toLocaleString("en-US", { month: "long", year: "numeric" });
   }
   if (frequency === "semester") return `Semester ${index}`;
+  if (frequency === "yearly") return `Year ${index}`;
   if (frequency === "weekly") return `Week ${index}`;
   return `Day ${index}`;
 }
