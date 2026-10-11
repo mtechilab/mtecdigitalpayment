@@ -48,7 +48,9 @@ router.post("/webhook", express.raw({ type: "application/json" }), async (req, r
 
   // For a one-time code, `reference` is submission.id — set by /initiate
   // before the Payment Code was created.
-  const oneTimeSubmissionId = payload?.data?.reference;
+  // Read the reference from the same place as providerReference above. Previously only
+  // data.reference was checked, so a payload carrying it inside processedPaymentData was dropped.
+  let oneTimeSubmissionId: string | undefined = processedPaymentData?.reference ?? payload?.data?.reference;
 
   console.log(`[webhook] received ${eventName} (event ${eventId})`, { paymentId, paymentCodeId, oneTimeSubmissionId });
 
@@ -149,6 +151,24 @@ router.post("/webhook", express.raw({ type: "application/json" }), async (req, r
   // ONE-TIME: reference is the pre-created submission.id
   // (unchanged from the original working one-time flow)
   // =========================================================
+  // Find the submission by the payment code too, if the reference is missing.
+  if (!oneTimeSubmissionId && paymentCodeId) {
+    const { data: byCode } = await supabase
+      .from("payment_submissions").select("id").eq("monime_payment_code_id", paymentCodeId).maybeSingle();
+    if (byCode) oneTimeSubmissionId = byCode.id as string;
+  }
+
+  // Record what Monime sent BEFORE confirmation runs, so the payment is visible to the admin
+  // (payment id, order number, full payload) even if confirmation later fails.
+  if (oneTimeSubmissionId) {
+    await supabase.from("payment_submissions").update({
+      monime_payment_id: paymentId ?? null,
+      monime_order_number: findOrderNumber(payload),
+      monime_payload: payload,
+      webhook_received_at: new Date().toISOString(),
+    }).eq("id", oneTimeSubmissionId);
+  }
+
   if (!oneTimeSubmissionId) {
     console.error("[webhook] payment_code.completed with no matching recurrent plan or submission reference");
     return res.status(200).json({ received: true });
@@ -174,10 +194,34 @@ router.post("/webhook", express.raw({ type: "application/json" }), async (req, r
     await finalizeVerifiedPayment(oneTimeSubmissionId, "Monime (automatic)");
     console.log(`[webhook] submission ${oneTimeSubmissionId} finalized`);
   } catch (err) {
-    console.error("[webhook] finalize failed:", (err as Error).message);
+    // Monime has been paid, so this must not be lost. The event stays marked as
+    // processed (no double-credit on Monime's retry) and the payment is put in the
+    // admin queue with everything captured above for a manual check.
+    console.error("[webhook] finalize failed — moved to admin review:", (err as Error).message);
+    await supabase.from("payment_submissions").update({ status: "under_review" }).eq("id", oneTimeSubmissionId);
   }
 
   res.status(200).json({ received: true });
 });
 
 export default router;
+
+/** Monime's order number, found by key name. The exact field path was never confirmed
+ *  from a real delivery, so this searches for it; the full payload is stored beside it. */
+function findOrderNumber(node: unknown, depth = 0): string | null {
+  if (depth > 6 || node === null || typeof node !== "object") return null;
+  for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
+    if (/order/i.test(key) && typeof value === "string" && value.trim().length >= 4 && value.trim().length <= 40) {
+      return value.trim();
+    }
+    // An "order" object: take its first short string, e.g. order.number
+    if (/order/i.test(key) && value !== null && typeof value === "object") {
+      for (const inner of Object.values(value as Record<string, unknown>)) {
+        if (typeof inner === "string" && inner.trim().length >= 4 && inner.trim().length <= 40) return inner.trim();
+      }
+    }
+    const nested = findOrderNumber(value, depth + 1);
+    if (nested) return nested;
+  }
+  return null;
+}

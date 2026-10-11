@@ -251,6 +251,9 @@ create table payment_submissions (
   created_at timestamptz not null default now()
   proof_path text,
   proof_uploaded_at timestamptz
+  monime_order_number text,
+  monime_payload jsonb,
+  webhook_received_at timestamptz
 );
 create index idx_payment_submissions_plan on payment_submissions (payment_plan_id);
 create index idx_payment_submissions_student on payment_submissions (student_row_id);

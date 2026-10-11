@@ -280,8 +280,8 @@ export async function getPendingCashSubmissions() {
   const supabase = getSupabase();
   const { data, error } = await supabase
     .from("payment_submissions")
-    .select("id, mtec_reference, amount, method, provider_reference, proof_path, created_at, students(student_id, full_name)")
-    .eq("status", "under_review")
+    .select("id, mtec_reference, amount, method, status, provider_reference, proof_path, monime_order_number, monime_payment_id, webhook_received_at, created_at, students(student_id, full_name)")
+    .or("status.eq.under_review,and(method.eq.monime,status.eq.pending)")
     .order("created_at", { ascending: true });
   if (error) throw new Error(`getPendingCashSubmissions failed: ${error.message}`);
   return data;
