@@ -39,3 +39,19 @@ Staging checks:
 5. A new version does not replace the published one until it is approved.
 6. Rejecting an item records the reason in the audit log.
 7. A file over 5 MB, a video, and an invalid file name path are all refused.
+
+## AI Learning Studio (migration 014)
+Set these in Render, never in the app or in source control:
+- AI_BASE_URL: the provider's base address (any service using the chat-completions format)
+- AI_API_KEY: the provider key, server only
+- AI_MODEL: the model name
+- AI_MONTHLY_CALL_LIMIT: optional, default 200
+
+Staging checks:
+1. Without the three AI variables, generation returns the "not configured" message.
+2. A lecturer generates a draft; it appears in their list as draft.
+3. Another lecturer cannot read, edit or approve it (expect "not found").
+4. Editing saves; approving locks it; a locked draft refuses edits.
+5. Regenerating creates version 2 and keeps version 1.
+6. Students cannot see drafts through any route.
+7. The usage counter in ai_usage rises by one per generation.

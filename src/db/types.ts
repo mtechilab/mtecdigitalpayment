@@ -248,6 +248,18 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["library_versions"]["Row"]>;
         Relationships: [];
       };
+      ai_drafts: {
+        Row: { id: string; group_id: string; version: number; owner_staff_id: string; owner_name: string; kind: string; title: string; programme: string; course_code: string; topic: string; instructions: string; content: string; status: string; approved_at: string | null; created_at: string; updated_at: string };
+        Insert: Partial<Database["public"]["Tables"]["ai_drafts"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["ai_drafts"]["Row"]>;
+        Relationships: [];
+      };
+      ai_usage: {
+        Row: { month: string; calls: number; tokens: number };
+        Insert: Partial<Database["public"]["Tables"]["ai_usage"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["ai_usage"]["Row"]>;
+        Relationships: [];
+      };
       chat_messages: {
         Row: { id: string; student_row_id: string; sender_type: string; sender_name: string; message: string; created_at: string; students?: { student_id: string; full_name: string } | null };
         Insert: Partial<Database["public"]["Tables"]["chat_messages"]["Row"]>;
