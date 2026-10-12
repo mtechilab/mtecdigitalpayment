@@ -1,3 +1,5 @@
+import { recordAudit } from "../services/auditLogService.js";
+import { createStaffAccount, listStaffAccounts, setStaffAccountActive } from "../services/staffAccountService.js";
 import { DuplicateRequestError } from "../services/errors.js";
 import { listAudit } from "../services/auditLogService.js";
 import { getProofForAdmin } from "../services/paymentClaimService.js";
@@ -792,6 +794,48 @@ router.get("/audit", requireAdminAuth, async (req: Request, res: Response) => {
   } catch (err) {
     console.error("[/admin/audit] error:", (err as Error).message);
     res.status(500).json({ error: "Could not load the audit log." });
+  }
+});
+
+// ---- Staff accounts (admin-managed) ----
+router.get("/staff-accounts", requireAdminAuth, async (_req: Request, res: Response) => {
+  try {
+    res.json({ accounts: await listStaffAccounts() });
+  } catch (err) {
+    console.error("[/admin/staff-accounts GET] error:", (err as Error).message);
+    res.status(500).json({ error: "Could not load staff accounts." });
+  }
+});
+
+// POST /admin/staff-accounts — { username, password, fullName, role: "staff" | "lecturer" }
+router.post("/staff-accounts", requireAdminAuth, async (req: AdminRequest, res: Response) => {
+  try {
+    const { username, password, fullName, role } = req.body as { username?: string; password?: string; fullName?: string; role?: string };
+    if (!username || !password || !fullName || !role) {
+      return res.status(400).json({ error: "username, password, fullName and role are all required." });
+    }
+    const account = await createStaffAccount({ username, password, fullName, role });
+    await recordAudit({ actor: req.adminUsername || "admin", action: "staff_account.create",
+      entityType: "staff_account", entityId: account.id as string, detail: { username: account.username, role: account.role } });
+    res.json({ success: true, account });
+  } catch (err) {
+    console.error("[/admin/staff-accounts POST] error:", (err as Error).message);
+    res.status(400).json({ error: (err as Error).message || "Could not create staff account." });
+  }
+});
+
+// POST /admin/staff-accounts/:id/active — { active: boolean }. Disabling takes effect on the next request.
+router.post("/staff-accounts/:id/active", requireAdminAuth, async (req: AdminRequest, res: Response) => {
+  try {
+    const { active } = req.body as { active?: boolean };
+    if (typeof active !== "boolean") return res.status(400).json({ error: "active must be true or false." });
+    await setStaffAccountActive(req.params.id, active);
+    await recordAudit({ actor: req.adminUsername || "admin", action: active ? "staff_account.enable" : "staff_account.disable",
+      entityType: "staff_account", entityId: req.params.id });
+    res.json({ success: true });
+  } catch (err) {
+    console.error("[/admin/staff-accounts active] error:", (err as Error).message);
+    res.status(400).json({ error: (err as Error).message || "Could not update staff account." });
   }
 });
 

@@ -1,24 +1,41 @@
 import { Request, Response, NextFunction } from "express";
+import { verifyStaffToken, StaffIdentity } from "../services/staffAccountService.js";
 
-/**
- * Bare-minimum staff gate for the cash-approval stopgap. A single shared
- * secret via header, not a real per-staff-member login — that's the known
- * limitation here: this can't tell WHICH staff member approved something,
- * only that someone with the key did. Fine as a stopgap until there's an
- * actual staff_accounts table + real auth (see the database-unification
- * plan — this whole endpoint should move to that shared auth once it
- * exists, the same way the old admissions backend's requireStaffAuth did
- * for its own project).
- */
-export function requireStaffAuth(req: Request, res: Response, next: NextFunction) {
+/** A request that has passed the staff gate. `staff` is set for individual accounts and is
+ *  absent for the legacy shared key, which cannot say who acted. */
+export interface StaffRequest extends Request {
+  staff?: StaffIdentity;
+}
+
+let warnedLegacy = false;
+
+/** Individual staff sessions first (Authorization: Bearer). The shared X-Staff-Token is still
+ *  accepted during the transition so existing cash approvals keep working. Remove it once
+ *  every staff member has an account. */
+export async function requireStaffAuth(req: Request, res: Response, next: NextFunction) {
+  const auth = req.headers.authorization;
+  if (auth && auth.startsWith("Bearer ")) {
+    try {
+      const staff = await verifyStaffToken(auth.slice(7));
+      if (!staff) return res.status(401).json({ error: "Your staff session has ended. Sign in again." });
+      (req as StaffRequest).staff = staff;
+      return next();
+    } catch {
+      return res.status(401).json({ error: "Your staff session has ended. Sign in again." });
+    }
+  }
+
   const key = process.env.STAFF_API_KEY;
   if (!key) {
-    console.error("[staffAuth] STAFF_API_KEY not set — refusing all staff requests until configured.");
-    return res.status(500).json({ error: "Staff access is not configured on this server." });
+    console.error("[staffAuth] STAFF_API_KEY not set — refusing legacy staff requests.");
+    return res.status(401).json({ error: "Sign in with your staff account." });
   }
-  const provided = req.headers["x-staff-token"];
-  if (provided !== key) {
-    return res.status(401).json({ error: "Invalid or missing staff token." });
+  if (req.headers["x-staff-token"] !== key) {
+    return res.status(401).json({ error: "Sign in with your staff account." });
   }
-  next();
+  if (!warnedLegacy) {
+    console.warn("[staffAuth] shared staff key used — move staff to individual accounts.");
+    warnedLegacy = true;
+  }
+  return next();
 }

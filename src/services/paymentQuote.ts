@@ -14,7 +14,11 @@ export const FREQUENCY_STEP_DAYS: Record<PayFrequency, number> = {
 
 export const PAY_FREQUENCIES: PayFrequency[] = ["daily", "weekly", "monthly", "semester", "yearly"];
 
-const cents = (n: number) => Math.ceil(n * 100 - 1e-9) / 100;
+// Rounds up to whole cents. Returns +0 (never -0) so an empty balance displays as 0.
+const cents = (n: number) => {
+  const c = Math.ceil(n * 100 - 1e-9) / 100;
+  return c === 0 ? 0 : c;
+};
 
 export interface FrequencyQuote {
   frequency: PayFrequency;

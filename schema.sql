@@ -509,3 +509,14 @@ create table admin_audit_log (
 );
 create index idx_admin_audit_created on admin_audit_log (created_at desc);
 alter table admin_audit_log enable row level security;
+
+create table staff_accounts (
+  id uuid primary key default gen_random_uuid(),
+  username text not null unique,
+  password_hash text not null,
+  full_name text not null,
+  role text not null default 'staff' check (role in ('staff', 'lecturer')),
+  active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+alter table staff_accounts enable row level security;

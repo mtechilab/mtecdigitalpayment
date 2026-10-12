@@ -230,6 +230,12 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["admin_audit_log"]["Row"]>;
         Relationships: [];
       };
+      staff_accounts: {
+        Row: { id: string; username: string; password_hash: string; full_name: string; role: string; active: boolean; created_at: string };
+        Insert: Partial<Database["public"]["Tables"]["staff_accounts"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["staff_accounts"]["Row"]>;
+        Relationships: [];
+      };
       chat_messages: {
         Row: { id: string; student_row_id: string; sender_type: string; sender_name: string; message: string; created_at: string; students?: { student_id: string; full_name: string } | null };
         Insert: Partial<Database["public"]["Tables"]["chat_messages"]["Row"]>;
