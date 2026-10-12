@@ -55,3 +55,10 @@ Staging checks:
 5. Regenerating creates version 2 and keeps version 1.
 6. Students cannot see drafts through any route.
 7. The usage counter in ai_usage rises by one per generation.
+
+## Staff roles (migration 015)
+Roles: staff, lecturer, administrator.
+- Lecturers and administrators can use the library and the AI studio.
+- Administrators can also add versions to library items uploaded by others.
+- Account management stays with the admin portal: create, list, update (name, role, password), enable or disable, and delete. Delete is refused for accounts that have authored material; disable those instead.
+Staging: create one account of each role, sign in as each, and check the access listed above.

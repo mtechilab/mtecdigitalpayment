@@ -1,3 +1,4 @@
+import { canTeach, isAdministratorRole } from "../services/staffValidation.js";
 import { Router, Request, Response, NextFunction } from "express";
 import { requireStaffAuth, StaffRequest } from "../middleware/staffAuth.js";
 import { requireStudentAuth, AuthenticatedRequest } from "../middleware/auth.js";
@@ -12,6 +13,11 @@ function filtersFrom(query: Request["query"]): LibraryFilters {
   };
 }
 
+/** Administrators see and version all staff material; lecturers see their own. */
+function viewerOf(staff: { id: string; role: string }) {
+  return isAdministratorRole(staff.role) ? { role: "admin" as const } : { role: "lecturer" as const, staffId: staff.id };
+}
+
 function fail(res: Response, err: unknown, fallback: string) {
   const message = (err as Error).message || fallback;
   const status = /not found/i.test(message) ? 404 : /only|not available/i.test(message) ? 403 : 400;
@@ -22,7 +28,7 @@ function fail(res: Response, err: unknown, fallback: string) {
 function requireLecturer(req: Request, res: Response, next: NextFunction) {
   const staff = (req as StaffRequest).staff;
   if (!staff) return res.status(401).json({ error: "Sign in with your own staff account." });
-  if (staff.role !== "lecturer") return res.status(403).json({ error: "Only lecturers can upload library material." });
+  if (!canTeach(staff.role)) return res.status(403).json({ error: "Only lecturers and administrators can use the library." });
   next();
 }
 
@@ -32,7 +38,7 @@ staffLibraryRouter.use(requireStaffAuth, requireLecturer);
 staffLibraryRouter.get("/", async (req: Request, res: Response) => {
   try {
     const staff = (req as StaffRequest).staff!;
-    res.json({ items: await listLibrary({ role: "lecturer", staffId: staff.id }, filtersFrom(req.query)) });
+    res.json({ items: await listLibrary(viewerOf(staff), filtersFrom(req.query)) });
   } catch (err) { fail(res, err, "Could not load the library."); }
 });
 
@@ -53,7 +59,7 @@ staffLibraryRouter.post("/:id/versions", async (req: Request, res: Response) => 
   try {
     const staff = (req as StaffRequest).staff!;
     const body = req.body as Record<string, string | undefined>;
-    const result = await addLibraryVersion({ id: staff.id, name: staff.fullName }, req.params.id, {
+    const result = await addLibraryVersion({ id: staff.id, name: staff.fullName, role: staff.role }, req.params.id, {
       fileName: body.fileName || "", contentType: body.contentType || "", fileBase64: body.fileBase64 || "",
     });
     res.json({ success: true, ...result });
@@ -63,7 +69,7 @@ staffLibraryRouter.post("/:id/versions", async (req: Request, res: Response) => 
 staffLibraryRouter.get("/:id/download", async (req: Request, res: Response) => {
   try {
     const staff = (req as StaffRequest).staff!;
-    res.json(await getLibraryDownload({ role: "lecturer", staffId: staff.id }, req.params.id));
+    res.json(await getLibraryDownload(viewerOf(staff), req.params.id));
   } catch (err) { fail(res, err, "Could not create the download link."); }
 });
 

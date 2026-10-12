@@ -1,3 +1,4 @@
+import { updateStaffAccount, deleteStaffAccount } from "../services/staffAccountService.js";
 import { recordAudit } from "../services/auditLogService.js";
 import { createStaffAccount, listStaffAccounts, setStaffAccountActive } from "../services/staffAccountService.js";
 import { DuplicateRequestError } from "../services/errors.js";
@@ -821,6 +822,34 @@ router.post("/staff-accounts", requireAdminAuth, async (req: AdminRequest, res: 
   } catch (err) {
     console.error("[/admin/staff-accounts POST] error:", (err as Error).message);
     res.status(400).json({ error: (err as Error).message || "Could not create staff account." });
+  }
+});
+
+// POST /admin/staff-accounts/:id/update — { fullName?, role?, password? }. Only the fields sent are changed.
+router.post("/staff-accounts/:id/update", requireAdminAuth, async (req: AdminRequest, res: Response) => {
+  try {
+    const { fullName, role, password } = req.body as { fullName?: string; role?: string; password?: string };
+    const account = await updateStaffAccount(req.params.id, { fullName, role, password });
+    await recordAudit({ actor: req.adminUsername || "admin", action: "staff_account.update",
+      entityType: "staff_account", entityId: req.params.id,
+      detail: { changed: Object.keys({ fullName, role, password }).filter((k) => ({ fullName, role, password } as Record<string, unknown>)[k] !== undefined) } });
+    res.json({ success: true, account });
+  } catch (err) {
+    console.error("[/admin/staff-accounts PATCH] error:", (err as Error).message);
+    res.status(400).json({ error: (err as Error).message || "Could not update staff account." });
+  }
+});
+
+// DELETE /admin/staff-accounts/:id — refused for accounts that have authored material
+router.delete("/staff-accounts/:id", requireAdminAuth, async (req: AdminRequest, res: Response) => {
+  try {
+    await deleteStaffAccount(req.params.id);
+    await recordAudit({ actor: req.adminUsername || "admin", action: "staff_account.delete",
+      entityType: "staff_account", entityId: req.params.id });
+    res.json({ success: true });
+  } catch (err) {
+    console.error("[/admin/staff-accounts DELETE] error:", (err as Error).message);
+    res.status(400).json({ error: (err as Error).message || "Could not delete staff account." });
   }
 });
 

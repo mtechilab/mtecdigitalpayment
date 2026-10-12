@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { getSupabase } from "../db/supabaseClient.js";
-import { normaliseUsername, validateNewStaffAccount } from "./staffValidation.js";
+import { normaliseUsername, validateNewStaffAccount, validateStaffUpdate } from "./staffValidation.js";
 
 export interface StaffIdentity {
   id: string;
@@ -69,5 +69,35 @@ export async function listStaffAccounts() {
 export async function setStaffAccountActive(id: string, active: boolean) {
   const { error } = await getSupabase().from("staff_accounts").update({ active }).eq("id", id);
   if (error) throw new Error(`setStaffAccountActive failed: ${error.message}`);
+  return { success: true };
+}
+
+/** Changes name, role and/or password. Only the fields given are changed. */
+export async function updateStaffAccount(id: string, patch: { fullName?: string; role?: string; password?: string }) {
+  const problem = validateStaffUpdate(patch);
+  if (problem) throw new Error(problem);
+  const update: { full_name?: string; role?: string; password_hash?: string } = {};
+  if (patch.fullName !== undefined) update.full_name = patch.fullName.trim();
+  if (patch.role !== undefined) update.role = patch.role;
+  if (patch.password !== undefined) update.password_hash = await bcrypt.hash(patch.password, 10);
+  if (Object.keys(update).length === 0) throw new Error("Nothing to change.");
+  const { data, error } = await getSupabase().from("staff_accounts").update(update).eq("id", id)
+    .select("id, username, full_name, role, active, created_at").maybeSingle();
+  if (error) throw new Error(`updateStaffAccount failed: ${error.message}`);
+  if (!data) throw new Error("That staff account was not found.");
+  return data;
+}
+
+/** Permanently deletes an account. An account that has uploaded material or drafts cannot be
+ *  deleted, because that would break the record of who made it; disable it instead. */
+export async function deleteStaffAccount(id: string) {
+  const { data, error } = await getSupabase().from("staff_accounts").delete().eq("id", id).select("id").maybeSingle();
+  if (error) {
+    if (error.code === "23503") {
+      throw new Error("This account has uploaded material or AI drafts, so it cannot be deleted. Disable it instead.");
+    }
+    throw new Error(`deleteStaffAccount failed: ${error.message}`);
+  }
+  if (!data) throw new Error("That staff account was not found.");
   return { success: true };
 }

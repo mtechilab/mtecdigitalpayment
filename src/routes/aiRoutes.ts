@@ -1,3 +1,4 @@
+import { canTeach } from "../services/staffValidation.js";
 import { Router, Request, Response } from "express";
 import { requireStaffAuth, StaffRequest } from "../middleware/staffAuth.js";
 import { rateLimit } from "../middleware/rateLimit.js";
@@ -7,7 +8,7 @@ import { createDraft, regenerateDraft, getDraft, listDrafts, saveDraft, approveD
 function requireLecturer(req: Request, res: Response, next: () => void) {
   const staff = (req as StaffRequest).staff;
   if (!staff) return res.status(401).json({ error: "Sign in with your own staff account." });
-  if (staff.role !== "lecturer") return res.status(403).json({ error: "Only lecturers can use the AI studio." });
+  if (!canTeach(staff.role)) return res.status(403).json({ error: "Only lecturers and administrators can use the AI studio." });
   return next();
 }
 

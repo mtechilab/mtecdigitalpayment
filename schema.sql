@@ -515,7 +515,7 @@ create table staff_accounts (
   username text not null unique,
   password_hash text not null,
   full_name text not null,
-  role text not null default 'staff' check (role in ('staff', 'lecturer')),
+  role text not null default 'staff' check (role in ('staff', 'lecturer', 'administrator')),
   active boolean not null default true,
   created_at timestamptz not null default now()
 );

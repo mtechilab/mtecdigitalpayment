@@ -67,7 +67,7 @@ export async function createLibraryItem(actor: { id: string; name: string }, inp
 }
 
 /** A lecturer replaces the material with a new version. Students keep the published one until this is approved. */
-export async function addLibraryVersion(actor: { id: string; name: string }, itemId: string, input: { fileName: string; contentType: string; fileBase64: string }) {
+export async function addLibraryVersion(actor: { id: string; name: string; role?: string }, itemId: string, input: { fileName: string; contentType: string; fileBase64: string }) {
   const check = validateLibraryFile(input);
   if (!check.ok) throw new Error(check.error);
   const supabase = getSupabase();
@@ -76,7 +76,10 @@ export async function addLibraryVersion(actor: { id: string; name: string }, ite
     .select("id, uploaded_by_staff_id, current_version").eq("id", itemId).maybeSingle();
   if (error) throw new Error(`addLibraryVersion failed: ${error.message}`);
   if (!item) throw new Error("That item was not found.");
-  if (item.uploaded_by_staff_id !== actor.id) throw new Error("You can only add versions to material you uploaded.");
+  const administrator = actor.role === "administrator";
+  if (item.uploaded_by_staff_id !== actor.id && !administrator) {
+    throw new Error("You can only add versions to material you uploaded.");
+  }
 
   const next = (item.current_version as number) + 1;
   await storeVersion(itemId, next, { ext: check.ext, fileName: check.fileName, contentType: input.contentType, sizeBytes: check.sizeBytes, fileBase64: input.fileBase64 }, actor.name);
