@@ -1,3 +1,4 @@
+import { DuplicateRequestError } from "./errors.js";
 import { recordProgrammeRequestIfUnknown } from "./academicSetupService.js";
 import { getSupabase } from "../db/supabaseClient.js";
 
@@ -19,6 +20,21 @@ export interface SubmitApplicationInput {
 
 export async function submitApplication(input: SubmitApplicationInput) {
   const supabase = getSupabase();
+
+  // One live application per phone, programme and year. A rejected one doesn't count,
+  // so the applicant can apply again after a rejection.
+  const { data: existing, error: existingError } = await supabase
+    .from("applications")
+    .select("id")
+    .eq("phone", input.phone.trim())
+    .eq("programme", input.programme.trim())
+    .eq("academic_year", input.academicYear.trim())
+    .neq("status", "rejected")
+    .limit(1);
+  if (existingError) throw new Error(`submitApplication (duplicate check) failed: ${existingError.message}`);
+  if (existing && existing.length > 0) {
+    throw new DuplicateRequestError("An application with this phone number for this programme and year already exists. Check your status, or contact admissions.");
+  }
 
   const { data: pin, error: pinError } = await supabase
     .from("application_pins")

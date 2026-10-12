@@ -1,3 +1,4 @@
+import { recordAudit } from "./auditLogService.js";
 import { FREQUENCY_STEP_DAYS } from "./paymentQuote.js";
 import { findProgrammeByName, findLevelByName, findSemesterByName } from "./academicSetupService.js";
 import bcrypt from "bcryptjs";
@@ -102,7 +103,7 @@ async function tryCreateDefaultPaymentPlan(studentRowId: string, programmeName: 
   }
 }
 
-export async function approveApplication(applicationId: string) {
+export async function approveApplication(applicationId: string, actor: string = "admin") {
   const supabase = getSupabase();
 
   const { data: application, error: appError } = await supabase
@@ -141,6 +142,8 @@ export async function approveApplication(applicationId: string) {
 
   const paymentPlanCreated = await tryCreateDefaultPaymentPlan(student.id, application.programme);
 
+  await recordAudit({ actor, action: "application.approve", entityType: "application",
+    entityId: applicationId, detail: { studentId } });
   return { studentId, pin, paymentPlanCreated };
 }
 
@@ -220,7 +223,7 @@ export async function registerStudentDirect(input: RegisterStudentDirectInput) {
   return { studentId, pin: pinCode, paymentPlanCreated };
 }
 
-export async function rejectApplication(applicationId: string, reason: string) {
+export async function rejectApplication(applicationId: string, reason: string, actor: string = "admin") {
   const supabase = getSupabase();
 
   const { data: application, error: appError } = await supabase
@@ -234,6 +237,8 @@ export async function rejectApplication(applicationId: string, reason: string) {
   const { error } = await supabase
     .from("applications").update({ status: "rejected", rejection_reason: reason }).eq("id", applicationId);
   if (error) throw new Error(`rejectApplication failed: ${error.message}`);
+  await recordAudit({ actor, action: "application.reject", entityType: "application",
+    entityId: applicationId, detail: { reason } });
   return { success: true };
 }
 
@@ -434,11 +439,16 @@ export async function listPendingPayments() {
 }
 
 export async function verifyPendingPayment(submissionId: string, verifiedByAdmin: string) {
-  return finalizeVerifiedPayment(submissionId, `Cash (confirmed by ${verifiedByAdmin})`);
+  const result = await finalizeVerifiedPayment(submissionId, `Cash (confirmed by ${verifiedByAdmin})`);
+  await recordAudit({ actor: verifiedByAdmin, action: "payment.verify", entityType: "payment_submission",
+    entityId: submissionId, detail: { alreadyProcessed: result.alreadyProcessed } });
+  return result;
 }
 
-export async function rejectPendingPayment(submissionId: string, reason: string) {
-  return rejectSubmission(submissionId, reason);
+export async function rejectPendingPayment(submissionId: string, reason: string, actor: string = "admin") {
+  await rejectSubmission(submissionId, reason);
+  await recordAudit({ actor, action: "payment.reject", entityType: "payment_submission",
+    entityId: submissionId, detail: { reason } });
 }
 
 /* ==========================================================================

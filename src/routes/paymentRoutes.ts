@@ -1,3 +1,4 @@
+import { DuplicateRequestError } from "../services/errors.js";
 import { getPaymentQuote } from "../services/paymentQuoteService.js";
 import { claimPaid } from "../services/paymentClaimService.js";
 import { Router, Response } from "express";
@@ -129,6 +130,7 @@ router.post("/initiate", async (req: AuthenticatedRequest, res: Response) => {
     // only reads .getJSONObject("monime") when method === MONIME.
     res.json({ transaction: { mtecReference: submission.mtec_reference, amount, paymentType: "one_time" } });
   } catch (err) {
+    if (err instanceof DuplicateRequestError) return res.status(409).json({ error: (err as Error).message });
     console.error("[/payments/initiate] error:", (err as Error).message);
     res.status(500).json({ error: "Could not start payment. Please try again." });
   }

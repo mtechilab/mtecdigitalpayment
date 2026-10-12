@@ -1,3 +1,5 @@
+import { DuplicateRequestError } from "../services/errors.js";
+import { listAudit } from "../services/auditLogService.js";
 import { getProofForAdmin } from "../services/paymentClaimService.js";
 import { getAcademicSetup, createProgramme, createLevel, createSemester, approveProgrammeRequest, rejectProgrammeRequest } from "../services/academicSetupService.js";
 import { Router, Request, Response } from "express";
@@ -97,9 +99,9 @@ router.get("/applications/:id", requireAdminAuth, async (req: Request, res: Resp
 });
 
 // POST /admin/applications/:id/approve — creates the student, returns { studentId, pin }
-router.post("/applications/:id/approve", requireAdminAuth, async (req: Request, res: Response) => {
+router.post("/applications/:id/approve", requireAdminAuth, async (req: AdminRequest, res: Response) => {
   try {
-    const result = await approveApplication(req.params.id);
+    const result = await approveApplication(req.params.id, req.adminUsername || "admin");
     res.json(result);
   } catch (err) {
     console.error("[/admin/applications/:id/approve] error:", (err as Error).message);
@@ -108,11 +110,11 @@ router.post("/applications/:id/approve", requireAdminAuth, async (req: Request, 
 });
 
 // POST /admin/applications/:id/reject — { reason }
-router.post("/applications/:id/reject", requireAdminAuth, async (req: Request, res: Response) => {
+router.post("/applications/:id/reject", requireAdminAuth, async (req: AdminRequest, res: Response) => {
   try {
     const { reason } = req.body as { reason?: string };
     if (!reason) return res.status(400).json({ error: "reason is required." });
-    await rejectApplication(req.params.id, reason);
+    await rejectApplication(req.params.id, reason, req.adminUsername || "admin");
     res.json({ success: true });
   } catch (err) {
     console.error("[/admin/applications/:id/reject] error:", (err as Error).message);
@@ -281,11 +283,11 @@ router.post("/payments/:id/verify", requireAdminAuth, async (req: AdminRequest, 
 });
 
 // POST /admin/payments/:id/reject — { reason }
-router.post("/payments/:id/reject", requireAdminAuth, async (req: Request, res: Response) => {
+router.post("/payments/:id/reject", requireAdminAuth, async (req: AdminRequest, res: Response) => {
   try {
     const { reason } = req.body as { reason?: string };
     if (!reason) return res.status(400).json({ error: "reason is required." });
-    await rejectPendingPayment(req.params.id, reason);
+    await rejectPendingPayment(req.params.id, reason, req.adminUsername || "admin");
     res.json({ success: true });
   } catch (err) {
     console.error("[/admin/payments/:id/reject] error:", (err as Error).message);
@@ -779,6 +781,17 @@ router.post("/academic-setup/programme-requests/:id/reject", requireAdminAuth, a
   } catch (err) {
     console.error("[/admin/academic-setup/programme-requests reject] error:", (err as Error).message);
     res.status(400).json({ error: (err as Error).message || "Could not reject request." });
+  }
+});
+
+// GET /admin/audit?limit= — the record of admin decisions, newest first
+router.get("/audit", requireAdminAuth, async (req: Request, res: Response) => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 100, 500);
+    res.json({ entries: await listAudit(limit) });
+  } catch (err) {
+    console.error("[/admin/audit] error:", (err as Error).message);
+    res.status(500).json({ error: "Could not load the audit log." });
   }
 });
 

@@ -1,3 +1,4 @@
+import { DuplicateRequestError } from "../services/errors.js";
 import { Router, Request, Response } from "express";
 import { submitApplication } from "../services/applicationSubmissionService.js";
 import { rateLimit } from "../middleware/rateLimit.js";
@@ -18,6 +19,7 @@ router.post("/submit", rateLimit("application-submit", 20, 60*60*1000), async (r
     res.json({ success: true, applicationNumber: application.application_number });
   } catch (err) {
     console.error("[/applications/submit] error:", (err as Error).message);
+    if (err instanceof DuplicateRequestError) return res.status(409).json({ error: (err as Error).message });
     res.status(500).json({ error: "Could not submit application." });
   }
 });

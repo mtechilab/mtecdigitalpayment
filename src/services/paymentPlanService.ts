@@ -1,3 +1,4 @@
+import { DuplicateRequestError } from "./errors.js";
 import { getSupabase } from "../db/supabaseClient.js";
 import { createRecurrentPaymentCode } from "./monimeClient.js";
 
@@ -226,45 +227,23 @@ export async function generateMtecReference(studentRowId: string): Promise<strin
  *  confirmed it. */
 export async function finalizeVerifiedPayment(submissionId: string, verifiedBy: string) {
   const supabase = getSupabase();
-
-  const { data: submission, error: subError } = await supabase
-    .from("payment_submissions").select("*").eq("id", submissionId).single();
-  if (subError) throw new Error(`finalizeVerifiedPayment fetch failed: ${subError.message}`);
-  if (submission.status === "verified") return { alreadyProcessed: true };
-
-  const periods = await getPeriodsForPlan(submission.payment_plan_id as string);
-  const { updates, leftover } = allocateAmountAcrossPeriods(periods, Number(submission.amount));
-
-  for (const u of updates) {
-    await supabase.from("payment_periods").update({ amount_paid: u.newAmountPaid, status: u.newStatus }).eq("id", u.id);
-  }
-
-  await supabase.from("payment_submissions").update({
-    status: "verified", verified_by: verifiedBy, verified_at: new Date().toISOString(),
-  }).eq("id", submissionId);
-
-  const { data: student } = await supabase
-    .from("students").select("student_id, full_name, programme")
-    .eq("id", submission.student_row_id).single();
-
-  const previousBalance = periods.reduce((s, p) => s + (Number(p.amount_due) - Number(p.amount_paid)), 0);
-  await supabase.from("receipts").insert({
-    receipt_number: await nextReceiptNumber(),
-    student_row_id: submission.student_row_id,
-    student_id_number: student?.student_id,
-    student_name: student?.full_name,
-    programme: student?.programme,
-    amount: submission.amount,
-    method: submission.method === "monime" ? "monime" : "bank",
-    received_by: verifiedBy,
-    previous_balance: previousBalance,
-    new_balance: previousBalance - Number(submission.amount) + leftover,
+  // The whole confirmation runs as one database function (migration 010): it locks the
+  // submission, allocates the amount, marks it verified and writes the receipt together,
+  // or none of it. A repeat call finds the payment already verified and changes nothing.
+  const rpc = supabase.rpc as unknown as (
+    fn: string, args: Record<string, unknown>,
+  ) => PromiseLike<{ data: unknown; error: { message: string } | null }>;
+  const { data, error } = await rpc.call(supabase, "finalize_payment", {
+    p_submission_id: submissionId,
+    p_verified_by: verifiedBy,
   });
+  if (error) throw new Error(`finalizeVerifiedPayment failed: ${error.message}`);
 
-  if (leftover > 0) {
-    console.warn(`[paymentPlanService] Submission ${submissionId} had ${leftover} leftover after allocation.`);
+  const result = (data || {}) as { alreadyProcessed?: boolean; leftover?: number };
+  if (result.leftover && result.leftover > 0) {
+    console.warn(`[paymentPlanService] Submission ${submissionId} had ${result.leftover} leftover after allocation.`);
   }
-  return { alreadyProcessed: false, leftover };
+  return { alreadyProcessed: result.alreadyProcessed === true, leftover: result.leftover ?? 0 };
 }
 
 export async function rejectSubmission(submissionId: string, reason: string) {
@@ -280,7 +259,7 @@ export async function getPendingCashSubmissions() {
   const supabase = getSupabase();
   const { data, error } = await supabase
     .from("payment_submissions")
-    .select("id, mtec_reference, amount, method, status, provider_reference, proof_path, monime_order_number, monime_payment_id, webhook_received_at, created_at, students(student_id, full_name)")
+    .select("id, mtec_reference, amount, method, status, provider_reference, proof_path, monime_order_number, monime_payment_id, monime_payload, webhook_received_at, created_at, students(student_id, full_name)")
     .or("status.eq.under_review,and(method.eq.monime,status.eq.pending)")
     .order("created_at", { ascending: true });
   if (error) throw new Error(`getPendingCashSubmissions failed: ${error.message}`);
@@ -294,6 +273,24 @@ export async function createSubmission(studentRowId: string, amount: number, met
   const mtecReference = await generateMtecReference(studentRowId);
 
   const supabase = getSupabase();
+
+  // A double-tap or a retry must not open a second payment for the same amount while
+  // the first is still open. The window stops a payment stuck pending blocking forever.
+  const since = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+  const { data: open, error: openError } = await supabase
+    .from("payment_submissions")
+    .select("id")
+    .eq("student_row_id", studentRowId)
+    .eq("amount", amount)
+    .eq("method", method)
+    .in("status", ["pending", "under_review"])
+    .gte("created_at", since)
+    .limit(1);
+  if (openError) throw new Error(`createSubmission (duplicate check) failed: ${openError.message}`);
+  if (open && open.length > 0) {
+    throw new DuplicateRequestError("You already have a payment open for this amount. Use the code you were given, or wait 30 minutes before trying again.");
+  }
+
   const { data: submission, error } = await supabase
     .from("payment_submissions")
     .insert({

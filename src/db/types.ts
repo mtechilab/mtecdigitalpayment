@@ -224,6 +224,12 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["programme_requests"]["Row"]>;
         Relationships: [];
       };
+      admin_audit_log: {
+        Row: { id: string; actor: string; action: string; entity_type: string; entity_id: string; detail: unknown | null; created_at: string };
+        Insert: Partial<Database["public"]["Tables"]["admin_audit_log"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["admin_audit_log"]["Row"]>;
+        Relationships: [];
+      };
       chat_messages: {
         Row: { id: string; student_row_id: string; sender_type: string; sender_name: string; message: string; created_at: string; students?: { student_id: string; full_name: string } | null };
         Insert: Partial<Database["public"]["Tables"]["chat_messages"]["Row"]>;
