@@ -1,3 +1,4 @@
+import { staffLibraryRouter, studentLibraryRouter, adminLibraryRouter } from "./routes/libraryRoutes.js";
 import "dotenv/config";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -30,6 +31,9 @@ app.use((req, res, next) => {
 app.use("/auth", authRoutes);
 app.use("/applications", applicationRoutes);
 app.use("/programmes", programmeRoutes);
+app.use("/api/library/staff", staffLibraryRouter);
+app.use("/api/library/student", studentLibraryRouter);
+app.use("/api/library/admin", adminLibraryRouter);
 app.use("/payments", paymentRoutes);
 app.use("/api/staff", staffRoutes);
 app.use("/api/admin", adminRoutes);

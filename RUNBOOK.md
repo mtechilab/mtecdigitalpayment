@@ -28,3 +28,14 @@ Expected: 16 passing tests.
 
 ## 5. Production
 Only after every staging check passes, and with the decision recorded in the audit log.
+
+## Online library (migration 013)
+Run migration 013 on staging after 012. It creates a private `library` bucket.
+Staging checks:
+1. A lecturer with an individual account uploads a PDF; it is listed as pending for them.
+2. Students do not see it until an admin approves it.
+3. After approval, a student gets a signed link that opens the PDF and expires after 5 minutes.
+4. A lecturer cannot add a version to another lecturer's item (expect 403).
+5. A new version does not replace the published one until it is approved.
+6. Rejecting an item records the reason in the audit log.
+7. A file over 5 MB, a video, and an invalid file name path are all refused.
