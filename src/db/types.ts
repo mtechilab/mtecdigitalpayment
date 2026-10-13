@@ -278,6 +278,18 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["quiz_attempts"]["Row"]>;
         Relationships: [];
       };
+      assignments: {
+        Row: { id: string; owner_staff_id: string; owner_name: string; title: string; instructions: string; programme: string; course_code: string; due_at: string; status: string; published_at: string | null; created_at: string };
+        Insert: Partial<Database["public"]["Tables"]["assignments"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["assignments"]["Row"]>;
+        Relationships: [];
+      };
+      assignment_submissions: {
+        Row: { id: string; assignment_id: string; student_row_id: string; body: string; submitted_at: string; score: number | null; feedback: string | null; graded_at: string | null };
+        Insert: Partial<Database["public"]["Tables"]["assignment_submissions"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["assignment_submissions"]["Row"]>;
+        Relationships: [];
+      };
       chat_messages: {
         Row: { id: string; student_row_id: string; sender_type: string; sender_name: string; message: string; created_at: string; students?: { student_id: string; full_name: string } | null };
         Insert: Partial<Database["public"]["Tables"]["chat_messages"]["Row"]>;

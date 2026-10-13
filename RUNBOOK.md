@@ -80,3 +80,12 @@ Staging checks:
 - Students can ask general concept questions: POST /api/ai/student/ask with { "question": "..." }. Answers are not stored.
 - Word, PowerPoint, and image output are not included yet. They need new packages and an image model, which need separate approval.
 - Student questions accept an optional photo (JPG, PNG or WEBP, up to 4 MB), sent as imageBase64 and imageContentType. The model must support images; gemini-3.5-flash-lite should, but confirm on the first test.
+
+## Assignments (migration 017)
+Staging checks:
+1. A lecturer creates an assignment with a due date next week and publishes it.
+2. A student of the same programme sees it as open.
+3. The student submits; a second submission is refused (409).
+4. The lecturer sees the submission and grades it (0 to 100, with feedback).
+5. The student sees the score and feedback.
+6. An assignment with a due date in the past cannot be submitted.
