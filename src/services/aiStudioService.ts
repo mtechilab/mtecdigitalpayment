@@ -10,10 +10,14 @@ const MAX_TOKENS = 2000;
 /** Calls the configured provider. Configure with AI_BASE_URL, AI_API_KEY and AI_MODEL. The key
  *  is read here on the server only and never appears in an error or a log line. */
 async function callProvider(messages: { role: string; content: string }[]): Promise<{ text: string; tokens: number }> {
-  const baseUrl = process.env.AI_BASE_URL;
-  const apiKey = process.env.AI_API_KEY;
-  const model = process.env.AI_MODEL;
+  const baseUrl = (process.env.AI_BASE_URL || "").trim();
+  const apiKey = (process.env.AI_API_KEY || "").trim();
+  const model = (process.env.AI_MODEL || "").trim();
   if (!baseUrl || !apiKey || !model) throw new Error("The AI studio is not configured yet. Ask an administrator.");
+  if (!/^https:\/\//.test(baseUrl)) {
+    console.error("[ai] AI_BASE_URL must start with https:// (check Render for stray spaces or quotes)");
+    throw new Error("The AI studio is misconfigured. Ask an administrator to check its settings.");
+  }
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -24,12 +28,27 @@ async function callProvider(messages: { role: string; content: string }[]): Prom
       body: JSON.stringify({ model, messages, max_tokens: MAX_TOKENS }),
       signal: controller.signal,
     });
-    if (!res.ok) throw new Error(`The AI service returned an error (${res.status}). Try again shortly.`);
+    if (!res.ok) {
+      // Log the provider's own short message, with the key removed if it ever appears in it.
+      const detail = (await res.text().catch(() => "")).slice(0, 300).split(apiKey).join("[key]");
+      console.error(`[ai] provider returned ${res.status}: ${detail}`);
+      if (res.status === 404) throw new Error("The AI model or address was not found. Ask an administrator to check AI_MODEL and AI_BASE_URL.");
+      if (res.status === 401 || res.status === 403) throw new Error("The AI service refused the key. Ask an administrator to check AI_API_KEY.");
+      if (res.status === 429) throw new Error("The AI service is busy or its free quota is used up. Try again later.");
+      throw new Error(`The AI service returned an error (${res.status}). Try again shortly.`);
+    }
     const parsed = extractDraftText(await res.json());
     if (!parsed) throw new Error("The AI service returned nothing usable. Try again.");
     return parsed;
   } catch (err) {
     if ((err as Error).name === "AbortError") throw new Error("The AI service took too long. Try again.");
+    // Network failures ("fetch failed") carry the real cause on err.cause. Log that code and host
+    // only: never the URL path, the key, or the request body.
+    const cause = (err as { cause?: { code?: string } }).cause;
+    if (cause || /fetch failed/i.test((err as Error).message)) {
+      console.error(`[ai] could not reach the provider (${cause?.code || "network error"}). Check AI_BASE_URL.`);
+      throw new Error("The AI service could not be reached. Ask an administrator to check its settings, then try again.");
+    }
     throw err;
   } finally {
     clearTimeout(timer);
