@@ -260,6 +260,24 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["ai_usage"]["Row"]>;
         Relationships: [];
       };
+      quizzes: {
+        Row: { id: string; owner_staff_id: string; owner_name: string; title: string; programme: string; course_code: string; status: string; published_at: string | null; created_at: string };
+        Insert: Partial<Database["public"]["Tables"]["quizzes"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["quizzes"]["Row"]>;
+        Relationships: [];
+      };
+      quiz_questions: {
+        Row: { id: string; quiz_id: string; position: number; question: string; options: unknown; correct_index: number };
+        Insert: Partial<Database["public"]["Tables"]["quiz_questions"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["quiz_questions"]["Row"]>;
+        Relationships: [];
+      };
+      quiz_attempts: {
+        Row: { id: string; quiz_id: string; student_row_id: string; score: number; total: number; answers: unknown; submitted_at: string };
+        Insert: Partial<Database["public"]["Tables"]["quiz_attempts"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["quiz_attempts"]["Row"]>;
+        Relationships: [];
+      };
       chat_messages: {
         Row: { id: string; student_row_id: string; sender_type: string; sender_name: string; message: string; created_at: string; students?: { student_id: string; full_name: string } | null };
         Insert: Partial<Database["public"]["Tables"]["chat_messages"]["Row"]>;

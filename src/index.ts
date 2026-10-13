@@ -1,3 +1,4 @@
+import { staffQuizRouter, studentQuizRouter } from "./routes/quizRoutes.js";
 import { aiStudioRouter } from "./routes/aiRoutes.js";
 import { staffLibraryRouter, studentLibraryRouter, adminLibraryRouter } from "./routes/libraryRoutes.js";
 import "dotenv/config";
@@ -36,6 +37,8 @@ app.use("/api/library/staff", staffLibraryRouter);
 app.use("/api/library/student", studentLibraryRouter);
 app.use("/api/library/admin", adminLibraryRouter);
 app.use("/api/ai/staff", aiStudioRouter);
+app.use("/api/quiz/staff", staffQuizRouter);
+app.use("/api/quiz/student", studentQuizRouter);
 app.use("/payments", paymentRoutes);
 app.use("/api/staff", staffRoutes);
 app.use("/api/admin", adminRoutes);

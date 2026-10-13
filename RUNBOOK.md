@@ -62,3 +62,15 @@ Roles: staff, lecturer, administrator.
 - Administrators can also add versions to library items uploaded by others.
 - Account management stays with the admin portal: create, list, update (name, role, password), enable or disable, and delete. Delete is refused for accounts that have authored material; disable those instead.
 Staging: create one account of each role, sign in as each, and check the access listed above.
+
+## AI model in use
+AI_MODEL = gemini-3.5-flash-lite (confirmed working in the studio). Google retires models over time: if a draft returns a 404 that names a replacement model, update AI_MODEL to that name.
+
+## Quizzes (migration 016)
+Staging checks:
+1. A lecturer creates a quiz with two questions and publishes it.
+2. A student of the same programme sees it in the list, with no answers shown.
+3. The student submits; the score and the correct answers come back.
+4. A second submission is refused (409).
+5. A student of another programme cannot open the quiz.
+6. The lecturer sees the score on the results page, and no other lecturer can.

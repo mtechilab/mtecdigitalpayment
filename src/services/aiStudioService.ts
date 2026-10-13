@@ -9,7 +9,7 @@ const MAX_TOKENS = 2000;
 
 /** Calls the configured provider. Configure with AI_BASE_URL, AI_API_KEY and AI_MODEL. The key
  *  is read here on the server only and never appears in an error or a log line. */
-async function callProvider(messages: { role: string; content: string }[]): Promise<{ text: string; tokens: number }> {
+async function callProvider(messages: { role: string; content: string }[], retried = false): Promise<{ text: string; tokens: number }> {
   const baseUrl = (process.env.AI_BASE_URL || "").trim();
   const apiKey = (process.env.AI_API_KEY || "").trim();
   const model = (process.env.AI_MODEL || "").trim();
@@ -28,6 +28,12 @@ async function callProvider(messages: { role: string; content: string }[]): Prom
       body: JSON.stringify({ model, messages, max_tokens: MAX_TOKENS }),
       signal: controller.signal,
     });
+    if (res.status === 503 && !retried) {
+      // Google reports brief demand spikes as 503. One retry after a short pause covers most of them.
+      clearTimeout(timer);
+      await new Promise((resolve) => setTimeout(resolve, 4000));
+      return callProvider(messages, true);
+    }
     if (!res.ok) {
       // Log the provider's own short message, with the key removed if it ever appears in it.
       const detail = (await res.text().catch(() => "")).slice(0, 300).split(apiKey).join("[key]");
