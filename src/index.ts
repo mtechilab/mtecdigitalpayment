@@ -1,3 +1,4 @@
+import { aiStudentRouter } from "./routes/aiStudentRoutes.js";
 import { staffQuizRouter, studentQuizRouter } from "./routes/quizRoutes.js";
 import { aiStudioRouter } from "./routes/aiRoutes.js";
 import { staffLibraryRouter, studentLibraryRouter, adminLibraryRouter } from "./routes/libraryRoutes.js";
@@ -39,6 +40,7 @@ app.use("/api/library/admin", adminLibraryRouter);
 app.use("/api/ai/staff", aiStudioRouter);
 app.use("/api/quiz/staff", staffQuizRouter);
 app.use("/api/quiz/student", studentQuizRouter);
+app.use("/api/ai/student", aiStudentRouter);
 app.use("/payments", paymentRoutes);
 app.use("/api/staff", staffRoutes);
 app.use("/api/admin", adminRoutes);

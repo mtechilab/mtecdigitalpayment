@@ -1,3 +1,4 @@
+import { streamDraftPdf, ExportableDraft } from "../services/aiExportService.js";
 import { canTeach } from "../services/staffValidation.js";
 import { Router, Request, Response } from "express";
 import { requireStaffAuth, StaffRequest } from "../middleware/staffAuth.js";
@@ -55,6 +56,14 @@ aiStudioRouter.post("/:id/regenerate", rateLimit("ai-generate", 20, 60 * 60 * 10
     const { instructions } = req.body as { instructions?: string };
     res.json({ success: true, draft: await regenerateDraft(lecturerOf(req), req.params.id, instructions || "") });
   } catch (err) { fail(res, err, "Could not regenerate the draft."); }
+});
+
+// GET /api/ai/staff/:id/export — the draft as a PDF, for the lecturer who owns it
+aiStudioRouter.get("/:id/export", async (req: Request, res: Response) => {
+  try {
+    const draft = await getDraft(lecturerOf(req), req.params.id);
+    streamDraftPdf(draft as unknown as ExportableDraft, res);
+  } catch (err) { fail(res, err, "Could not export the draft."); }
 });
 
 aiStudioRouter.put("/:id", async (req: Request, res: Response) => {

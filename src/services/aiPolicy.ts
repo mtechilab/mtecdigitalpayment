@@ -67,3 +67,24 @@ export function extractDraftText(json: unknown): { text: string; tokens: number 
   const tokens = typeof o.usage?.total_tokens === "number" ? o.usage.total_tokens : 0;
   return { text: content.slice(0, MAX_OUTPUT_CHARS), tokens };
 }
+
+export const MAX_QUESTION_CHARS = 500;
+
+export function validateConceptQuestion(question: string): string | null {
+  const t = question.trim();
+  if (t.length < 3) return "Ask a question of at least 3 characters.";
+  if (t.length > MAX_QUESTION_CHARS) return `Keep the question under ${MAX_QUESTION_CHARS} characters.`;
+  return null;
+}
+
+const CONCEPT_SYSTEM = [
+  "You are a study helper for students at MTeC, Makeni Technical College of Innovative Technology in Sierra Leone.",
+  "Explain general academic concepts clearly and accurately, with simple examples suited to technical diploma students.",
+  "Do not discuss any particular student's fees, payments, results, accounts or personal details; say they should contact the college office for those.",
+  "Do not invent references or statistics. If you are unsure, say so and suggest checking with a lecturer.",
+  "Keep the answer under 400 words and use plain text.",
+].join(" ");
+
+export function buildConceptMessages(question: string): { role: "system" | "user"; content: string }[] {
+  return [{ role: "system", content: CONCEPT_SYSTEM }, { role: "user", content: question.trim() }];
+}

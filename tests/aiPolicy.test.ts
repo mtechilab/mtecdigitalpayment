@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { validateDraftRequest, buildMessages, budgetAllows, extractDraftText, DRAFT_KINDS, MAX_OUTPUT_CHARS } from "../src/services/aiPolicy.ts";
+import { validateDraftRequest, buildMessages, budgetAllows, extractDraftText, DRAFT_KINDS, MAX_OUTPUT_CHARS, validateConceptQuestion, buildConceptMessages } from "../src/services/aiPolicy.ts";
 
 const good = { kind: "lesson_plan", title: "Introduction to databases", programme: "Diploma in Computer Science" };
 
@@ -50,4 +50,16 @@ test("an empty or malformed provider reply yields nothing", () => {
 test("an over-long reply is cut to the storage limit", () => {
   const r = extractDraftText({ choices: [{ message: { content: "a".repeat(MAX_OUTPUT_CHARS + 500) } }] });
   assert.equal(r?.text.length, MAX_OUTPUT_CHARS);
+});
+
+test("a concept question must be 3 to 500 characters", () => {
+  assert.notEqual(validateConceptQuestion("hi"), null);
+  assert.equal(validateConceptQuestion("What is a binary number?"), null);
+  assert.notEqual(validateConceptQuestion("x".repeat(501)), null);
+});
+
+test("the concept prompt keeps student records out of the answer", () => {
+  const msgs = buildConceptMessages("What is ohm's law?");
+  assert.match(msgs[0].content, /fees, payments, results/);
+  assert.equal(msgs[1].content, "What is ohm's law?");
 });

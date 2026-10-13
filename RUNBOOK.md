@@ -74,3 +74,8 @@ Staging checks:
 4. A second submission is refused (409).
 5. A student of another programme cannot open the quiz.
 6. The lecturer sees the score on the results page, and no other lecturer can.
+
+## Draft export and student questions
+- Lecturers and administrators can download any draft they own as a PDF: GET /api/ai/staff/:id/export.
+- Students can ask general concept questions: POST /api/ai/student/ask with { "question": "..." }. Answers are not stored.
+- Word, PowerPoint, and image output are not included yet. They need new packages and an image model, which need separate approval.

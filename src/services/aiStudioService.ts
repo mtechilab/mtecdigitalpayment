@@ -1,6 +1,6 @@
 import { getSupabase } from "../db/supabaseClient.js";
 import { recordAudit } from "./auditLogService.js";
-import { validateDraftRequest, buildMessages, budgetAllows, extractDraftText, DraftRequest, MAX_OUTPUT_CHARS } from "./aiPolicy.js";
+import { validateDraftRequest, buildMessages, validateConceptQuestion, buildConceptMessages, budgetAllows, extractDraftText, DraftRequest, MAX_OUTPUT_CHARS } from "./aiPolicy.js";
 
 export interface Lecturer { id: string; fullName: string }
 
@@ -168,4 +168,16 @@ export async function approveDraft(owner: Lecturer, draftId: string) {
   if (error) throw new Error(`approveDraft failed: ${error.message}`);
   await recordAudit({ actor: owner.fullName, action: "ai.approve", entityType: "ai_draft", entityId: draftId, detail: { version: current.version } });
   return { success: true };
+}
+
+/** A general concept question from a student. Stateless: nothing about the student is stored. */
+export async function answerConcept(question: string): Promise<{ answer: string }> {
+  const problem = validateConceptQuestion(question);
+  if (problem) throw new Error(problem);
+  if (!budgetAllows(await monthlyCallsSoFar(), monthlyLimit())) {
+    throw new Error("The studio has reached its monthly limit. It resets next month.");
+  }
+  const result = await callProvider(buildConceptMessages(question));
+  await spendBudget(result.tokens);
+  return { answer: result.text };
 }
