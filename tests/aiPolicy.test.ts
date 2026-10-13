@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { validateDraftRequest, buildMessages, budgetAllows, extractDraftText, DRAFT_KINDS, MAX_OUTPUT_CHARS, validateConceptQuestion, buildConceptMessages } from "../src/services/aiPolicy.ts";
+import { validateDraftRequest, buildMessages, budgetAllows, extractDraftText, DRAFT_KINDS, MAX_OUTPUT_CHARS, validateConceptQuestion, buildConceptMessages, validateConceptImage, MAX_CONCEPT_IMAGE_BYTES } from "../src/services/aiPolicy.ts";
 
 const good = { kind: "lesson_plan", title: "Introduction to databases", programme: "Diploma in Computer Science" };
 
@@ -62,4 +62,23 @@ test("the concept prompt keeps student records out of the answer", () => {
   const msgs = buildConceptMessages("What is ohm's law?");
   assert.match(msgs[0].content, /fees, payments, results/);
   assert.equal(msgs[1].content, "What is ohm's law?");
+});
+
+test("a photo must be JPG, PNG or WEBP and under 4 MB", () => {
+  assert.equal(validateConceptImage("image/png", "aGVsbG8="), null);
+  assert.notEqual(validateConceptImage("application/pdf", "aGVsbG8="), null);
+  assert.notEqual(validateConceptImage("image/png", "not base64!"), null);
+  assert.notEqual(validateConceptImage("image/png", "A".repeat(Math.ceil((MAX_CONCEPT_IMAGE_BYTES + 10) * 4 / 3))), null);
+});
+
+test("a question with a photo is sent as text plus an image part", () => {
+  const msgs = buildConceptMessages("What is this?", { contentType: "image/png", base64: "aGVsbG8=" });
+  const parts = msgs[1].content as { type: string }[];
+  assert.equal(parts[0].type, "text");
+  assert.equal(parts[1].type, "image_url");
+});
+
+test("a photo with no question still gets a request to explain it", () => {
+  const msgs = buildConceptMessages("", { contentType: "image/jpeg", base64: "aGVsbG8=" });
+  assert.match((msgs[1].content as { text: string }[])[0].text, /explain what is shown/);
 });

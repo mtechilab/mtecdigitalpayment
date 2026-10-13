@@ -1,6 +1,6 @@
 import { getSupabase } from "../db/supabaseClient.js";
 import { recordAudit } from "./auditLogService.js";
-import { validateDraftRequest, buildMessages, validateConceptQuestion, buildConceptMessages, budgetAllows, extractDraftText, DraftRequest, MAX_OUTPUT_CHARS } from "./aiPolicy.js";
+import { validateDraftRequest, buildMessages, validateConceptQuestion, buildConceptMessages, validateConceptImage, budgetAllows, extractDraftText, DraftRequest, MAX_OUTPUT_CHARS } from "./aiPolicy.js";
 
 export interface Lecturer { id: string; fullName: string }
 
@@ -9,7 +9,7 @@ const MAX_TOKENS = 2000;
 
 /** Calls the configured provider. Configure with AI_BASE_URL, AI_API_KEY and AI_MODEL. The key
  *  is read here on the server only and never appears in an error or a log line. */
-async function callProvider(messages: { role: string; content: string }[], retried = false): Promise<{ text: string; tokens: number }> {
+async function callProvider(messages: { role: string; content: unknown }[], retried = false): Promise<{ text: string; tokens: number }> {
   const baseUrl = (process.env.AI_BASE_URL || "").trim();
   const apiKey = (process.env.AI_API_KEY || "").trim();
   const model = (process.env.AI_MODEL || "").trim();
@@ -171,13 +171,17 @@ export async function approveDraft(owner: Lecturer, draftId: string) {
 }
 
 /** A general concept question from a student. Stateless: nothing about the student is stored. */
-export async function answerConcept(question: string): Promise<{ answer: string }> {
-  const problem = validateConceptQuestion(question);
+export async function answerConcept(question: string, image?: { contentType: string; base64: string }): Promise<{ answer: string }> {
+  const problem = question.trim() === "" && image ? null : validateConceptQuestion(question);
   if (problem) throw new Error(problem);
+  if (image) {
+    const imageProblem = validateConceptImage(image.contentType, image.base64);
+    if (imageProblem) throw new Error(imageProblem);
+  }
   if (!budgetAllows(await monthlyCallsSoFar(), monthlyLimit())) {
     throw new Error("The studio has reached its monthly limit. It resets next month.");
   }
-  const result = await callProvider(buildConceptMessages(question));
+  const result = await callProvider(buildConceptMessages(question, image));
   await spendBudget(result.tokens);
   return { answer: result.text };
 }

@@ -79,3 +79,4 @@ Staging checks:
 - Lecturers and administrators can download any draft they own as a PDF: GET /api/ai/staff/:id/export.
 - Students can ask general concept questions: POST /api/ai/student/ask with { "question": "..." }. Answers are not stored.
 - Word, PowerPoint, and image output are not included yet. They need new packages and an image model, which need separate approval.
+- Student questions accept an optional photo (JPG, PNG or WEBP, up to 4 MB), sent as imageBase64 and imageContentType. The model must support images; gemini-3.5-flash-lite should, but confirm on the first test.

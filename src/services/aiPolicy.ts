@@ -85,6 +85,32 @@ const CONCEPT_SYSTEM = [
   "Keep the answer under 400 words and use plain text.",
 ].join(" ");
 
-export function buildConceptMessages(question: string): { role: "system" | "user"; content: string }[] {
-  return [{ role: "system", content: CONCEPT_SYSTEM }, { role: "user", content: question.trim() }];
+/** A photo a student attaches to a question, such as a circuit or a page from a book. */
+export const CONCEPT_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
+export const MAX_CONCEPT_IMAGE_BYTES = 4 * 1024 * 1024;
+
+export function validateConceptImage(contentType: string, base64: string): string | null {
+  if (!(CONCEPT_IMAGE_TYPES as readonly string[]).includes(contentType)) return "The photo must be a JPG, PNG or WEBP image.";
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(base64)) return "The photo could not be read.";
+  const bytes = Math.floor((base64.length * 3) / 4) - (base64.endsWith("==") ? 2 : base64.endsWith("=") ? 1 : 0);
+  if (bytes <= 0) return "The photo is empty.";
+  if (bytes > MAX_CONCEPT_IMAGE_BYTES) return "The photo is larger than 4 MB. Choose a smaller one.";
+  return null;
+}
+
+export type ContentPart = { type: "text"; text: string } | { type: "image_url"; image_url: { url: string } };
+export type ChatContent = string | ContentPart[];
+
+export function buildConceptMessages(
+  question: string,
+  image?: { contentType: string; base64: string },
+): { role: "system" | "user"; content: ChatContent }[] {
+  const text = question.trim() || "Please explain what is shown in this photo.";
+  const userContent: ChatContent = image
+    ? [
+        { type: "text" as const, text },
+        { type: "image_url" as const, image_url: { url: `data:${image.contentType};base64,${image.base64}` } },
+      ]
+    : text;
+  return [{ role: "system", content: CONCEPT_SYSTEM }, { role: "user", content: userContent }];
 }
