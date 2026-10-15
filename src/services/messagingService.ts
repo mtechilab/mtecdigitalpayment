@@ -73,19 +73,19 @@ export async function listConversations(viewer: Viewer) {
     add((await supabase.from("conversation_members").select("conversation_id").eq("member_kind", "student").eq("member_id", viewer.id)).data);
     add((await supabase.from("conversations").select("id").eq("kind", "programme").ilike("programme", viewer.programme)).data);
     const { data: myClasses } = await supabase.from("classes").select("id").contains("student_ids", [viewer.id]);
-    const classIds = (myClasses || []).map((c) => c.id as string);
+    const classIds = ((myClasses || []) as Array<Record<string, any>>).map((c) => c.id as string);
     if (classIds.length > 0) add((await supabase.from("conversations").select("id").eq("kind", "class").in("class_id", classIds)).data);
   } else {
     add((await supabase.from("conversation_members").select("conversation_id").eq("member_kind", "staff").eq("member_id", viewer.id)).data);
     if (canTeach(viewer.role)) {
       add((await supabase.from("conversations").select("id").eq("kind", "programme")).data);
-      const classQuery = supabase.from("conversations").select("id, class_id").eq("kind", "class");
+      const classQuery = supabase.from("conversations").select("id, class_id, created_by_staff_id").eq("kind", "class");
       const { data: classRows } = await classQuery;
       if (isAdministratorRole(viewer.role)) add(classRows);
       else {
         const { data: instructed } = await supabase.from("classes").select("id").ilike("instructor_name", viewer.name);
-        const instructedIds = new Set((instructed || []).map((c) => c.id as string));
-        for (const r of classRows || []) {
+        const instructedIds = new Set(((instructed || []) as Array<Record<string, any>>).map((c) => c.id as string));
+        for (const r of (classRows || []) as Array<Record<string, any>>) {
           if (r.created_by_staff_id === viewer.id || instructedIds.has(r.class_id as string)) ids.add(r.id as string);
         }
       }
@@ -100,14 +100,14 @@ export async function listConversations(viewer: Viewer) {
 
   const { data: reads } = await supabase.from("conversation_reads").select("conversation_id, last_read_at")
     .eq("reader_kind", viewer.kind).eq("reader_id", viewer.id);
-  const readAt = new Map((reads || []).map((r) => [r.conversation_id as string, r.last_read_at as string]));
+  const readAt = new Map(((reads || []) as Array<Record<string, any>>).map((r) => [r.conversation_id as string, r.last_read_at as string]));
 
   const result = [];
   for (const c of list) {
     const since = readAt.get(c.id) || "1970-01-01T00:00:00Z";
     const { data: fresh } = await supabase.from("messages").select("sender_kind, sender_id")
       .eq("conversation_id", c.id).gt("created_at", since).limit(200);
-    const unread = unreadCount((fresh || []).map((m) => ({ senderKind: m.sender_kind as string, senderId: m.sender_id as string })), viewer.kind, viewer.id);
+    const unread = unreadCount(((fresh || []) as Array<Record<string, any>>).map((m) => ({ senderKind: m.sender_kind as string, senderId: m.sender_id as string })), viewer.kind, viewer.id);
     result.push({ id: c.id, kind: c.kind, title: c.title, programme: c.programme, lastMessageAt: c.last_message_at, unread });
   }
   return result;
@@ -218,7 +218,7 @@ export async function startDirectChat(staff: { id: string; name: string; role: s
   const student = await studentViewer(studentRowId);
   const { data: mine } = await supabase.from("conversation_members").select("conversation_id")
     .eq("member_kind", "staff").eq("member_id", staff.id);
-  const candidates = (mine || []).map((m) => m.conversation_id as string);
+  const candidates = ((mine || []) as Array<Record<string, any>>).map((m) => m.conversation_id as string);
   if (candidates.length > 0) {
     const { data: shared } = await supabase.from("conversation_members").select("conversation_id")
       .eq("member_kind", "student").eq("member_id", student.id).in("conversation_id", candidates).maybeSingle();
