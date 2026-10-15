@@ -89,3 +89,19 @@ Staging checks:
 4. The lecturer sees the submission and grades it (0 to 100, with feedback).
 5. The student sees the score and feedback.
 6. An assignment with a due date in the past cannot be submitted.
+
+## MTeC Connect: messaging (migration 018)
+Requires migration 012 (staff accounts) and the existing students and classes tables.
+Rules:
+- Administrators create programme groups: POST /api/messages/staff/groups/programme { programme }.
+- Lecturers create class groups for classes they teach, and administrators for any class: POST /api/messages/staff/groups/class { classId }.
+- Lecturers and administrators start a direct chat with a student: POST /api/messages/staff/direct { studentRowId }.
+- Students cannot create groups or start chats.
+- Group access follows the programme and class records, so no membership step is needed.
+- Text messages up to 2000 characters. Voice notes up to 120 seconds and 2 MB, in private storage.
+Staging checks:
+1. An administrator creates a programme group; a student of that programme sees it; a student of another programme does not.
+2. A class group is visible to the students enrolled in that class only.
+3. A student sends a text; the lecturer sees it in the conversation, with an unread count of 1 before reading.
+4. A voice note plays through its link, and the link expires after 5 minutes.
+5. A student tries to create a group, and is refused.

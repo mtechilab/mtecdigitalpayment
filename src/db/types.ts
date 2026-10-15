@@ -290,6 +290,30 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["assignment_submissions"]["Row"]>;
         Relationships: [];
       };
+      conversations: {
+        Row: { id: string; kind: string; title: string; programme: string | null; class_id: string | null; created_by_staff_id: string | null; created_by_name: string; last_message_at: string | null; created_at: string };
+        Insert: Partial<Database["public"]["Tables"]["conversations"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["conversations"]["Row"]>;
+        Relationships: [];
+      };
+      conversation_members: {
+        Row: { conversation_id: string; member_kind: string; member_id: string; member_name: string };
+        Insert: Partial<Database["public"]["Tables"]["conversation_members"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["conversation_members"]["Row"]>;
+        Relationships: [];
+      };
+      messages: {
+        Row: { id: string; conversation_id: string; sender_kind: string; sender_id: string; sender_name: string; kind: string; body: string | null; voice_path: string | null; voice_seconds: number | null; created_at: string };
+        Insert: Partial<Database["public"]["Tables"]["messages"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["messages"]["Row"]>;
+        Relationships: [];
+      };
+      conversation_reads: {
+        Row: { conversation_id: string; reader_kind: string; reader_id: string; last_read_at: string };
+        Insert: Partial<Database["public"]["Tables"]["conversation_reads"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["conversation_reads"]["Row"]>;
+        Relationships: [];
+      };
       chat_messages: {
         Row: { id: string; student_row_id: string; sender_type: string; sender_name: string; message: string; created_at: string; students?: { student_id: string; full_name: string } | null };
         Insert: Partial<Database["public"]["Tables"]["chat_messages"]["Row"]>;
