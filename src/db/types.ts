@@ -104,6 +104,7 @@ export interface Database {
           level: string;
           status: string;
           created_at: string;
+          profile_photo_path: string | null;
         };
         Insert: Partial<Database["public"]["Tables"]["students"]["Row"]>;
         Update: Partial<Database["public"]["Tables"]["students"]["Row"]>;

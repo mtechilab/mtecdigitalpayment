@@ -125,6 +125,7 @@ create table students (
   level text not null default 'Year 1',
   status text not null default 'active' check (status in ('active','inactive','graduated','withdrawn')),
   created_at timestamptz not null default now()
+  profile_photo_path text
 );
 create index idx_students_student_id on students (student_id);
 
@@ -705,3 +706,6 @@ alter table messages enable row level security;
 alter table conversation_reads enable row level security;
 
 insert into storage.buckets (id, name, public) values ('voice-notes', 'voice-notes', false) on conflict (id) do nothing;
+
+-- Student profile photos (migration 019)
+insert into storage.buckets (id, name, public) values ('profile-photos', 'profile-photos', false) on conflict (id) do nothing;
