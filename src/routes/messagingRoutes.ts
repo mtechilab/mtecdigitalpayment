@@ -3,6 +3,7 @@ import { requireStaffAuth, StaffRequest } from "../middleware/staffAuth.js";
 import { requireStudentAuth, AuthenticatedRequest } from "../middleware/auth.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 import { canTeach } from "../services/staffValidation.js";
+import { callMode } from "../services/messagingPolicy.js";
 import { Viewer, studentViewer, listConversations, listMessages, sendMessage, markRead, createProgrammeGroup, createClassGroup, startDirectChat, listTeachableClasses, listStudentDirectory, startStudentChat, createCallLink } from "../services/messagingService.js";
 
 function fail(res: Response, err: unknown, fallback: string) {
@@ -62,7 +63,7 @@ studentMessagingRouter.post("/direct", async (req: AuthenticatedRequest, res: Re
 });
 
 studentMessagingRouter.post("/conversations/:id/call-link", async (req: AuthenticatedRequest, res: Response) => {
-  try { res.json({ success: true, ...(await createCallLink(await viewerOf(req), req.params.id)) }); }
+  try { res.json({ success: true, ...(await createCallLink(await viewerOf(req), req.params.id, callMode((req.body || {}).mode))) }); }
   catch (err) { fail(res, err, "Could not start the call."); }
 });
 
@@ -98,7 +99,7 @@ staffMessagingRouter.post("/conversations/:id/messages", rateLimit("msg-post", 1
 });
 
 staffMessagingRouter.post("/conversations/:id/call-link", async (req: Request, res: Response) => {
-  try { res.json({ success: true, ...(await createCallLink(staffViewer(req), req.params.id)) }); }
+  try { res.json({ success: true, ...(await createCallLink(staffViewer(req), req.params.id, callMode((req.body || {}).mode))) }); }
   catch (err) { fail(res, err, "Could not start the call."); }
 });
 

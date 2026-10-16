@@ -2,7 +2,7 @@ import { validateChatFile } from "./chatFilePolicy.js";
 import { randomBytes } from "crypto";
 import { getSupabase } from "../db/supabaseClient.js";
 import { recordAudit } from "./auditLogService.js";
-import { validateText, validateVoice, unreadCount } from "./messagingPolicy.js";
+import { validateText, validateVoice, unreadCount, callLinkUrl, CallMode } from "./messagingPolicy.js";
 import { canTeach, isAdministratorRole } from "./staffValidation.js";
 
 export type Viewer =
@@ -341,10 +341,11 @@ export async function startStudentChat(viewer: Viewer, otherStudentId: string) {
 
 /** A web call link for a conversation's members, posted into the chat so everyone in it can join.
  *  The room is a public video meeting; anyone who holds the link can join it. */
-export async function createCallLink(viewer: Viewer, conversationId: string) {
+export async function createCallLink(viewer: Viewer, conversationId: string, mode: CallMode) {
   await requireAccess(conversationId, viewer);
   const room = `MTeC-${conversationId.slice(0, 8)}-${randomBytes(6).toString("hex")}`;
-  const url = `https://meet.jit.si/${room}`;
-  await sendMessage(viewer, conversationId, { body: `${viewer.name} started a video call. Join here: ${url}` });
+  const url = callLinkUrl(room, mode);
+  const kind = mode === "audio" ? "voice" : "video";
+  await sendMessage(viewer, conversationId, { body: `${viewer.name} started a ${kind} call. Join here: ${url}` });
   return { url };
 }

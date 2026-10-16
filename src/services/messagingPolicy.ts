@@ -31,3 +31,16 @@ export function groupAccessRule(kind: string): "all-students-of-programme" | "cl
 export function unreadCount(messagesAfterRead: { senderKind: string; senderId: string }[], viewerKind: string, viewerId: string): number {
   return messagesAfterRead.filter((m) => !(m.senderKind === viewerKind && m.senderId === viewerId)).length;
 }
+
+export type CallMode = "audio" | "video";
+
+/** Anything other than "audio" is a video call, so a bad value never starts a voice call by mistake. */
+export function callMode(raw: unknown): CallMode {
+  return raw === "audio" ? "audio" : "video";
+}
+
+/** A meeting link. A voice call starts with the camera off; a video call starts with it on. */
+export function callLinkUrl(room: string, mode: CallMode): string {
+  const base = `https://meet.jit.si/${room}`;
+  return mode === "audio" ? `${base}#config.startWithVideoMuted=true` : base;
+}
