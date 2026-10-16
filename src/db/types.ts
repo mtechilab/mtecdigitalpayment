@@ -304,7 +304,7 @@ export interface Database {
         Relationships: [];
       };
       messages: {
-        Row: { id: string; conversation_id: string; sender_kind: string; sender_id: string; sender_name: string; kind: string; body: string | null; voice_path: string | null; voice_seconds: number | null; file_path: string | null; file_name: string | null; file_type: string | null; file_size: number | null; created_at: string };
+        Row: { id: string; conversation_id: string; sender_kind: string; sender_id: string; sender_name: string; kind: string; body: string | null; voice_path: string | null; voice_seconds: number | null; file_path: string | null; file_name: string | null; file_type: string | null; file_size: number | null; reply_to: string | null; deleted_for_everyone: boolean; created_at: string };
         Insert: Partial<Database["public"]["Tables"]["messages"]["Row"]>;
         Update: Partial<Database["public"]["Tables"]["messages"]["Row"]>;
         Relationships: [];
@@ -313,6 +313,24 @@ export interface Database {
         Row: { conversation_id: string; reader_kind: string; reader_id: string; last_read_at: string };
         Insert: Partial<Database["public"]["Tables"]["conversation_reads"]["Row"]>;
         Update: Partial<Database["public"]["Tables"]["conversation_reads"]["Row"]>;
+        Relationships: [];
+      };
+      message_hidden: {
+        Row: { message_id: string; viewer_kind: string; viewer_id: string };
+        Insert: Partial<Database["public"]["Tables"]["message_hidden"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["message_hidden"]["Row"]>;
+        Relationships: [];
+      };
+      message_reactions: {
+        Row: { message_id: string; reactor_kind: string; reactor_id: string; reaction: string; created_at: string };
+        Insert: Partial<Database["public"]["Tables"]["message_reactions"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["message_reactions"]["Row"]>;
+        Relationships: [];
+      };
+      conversation_typing: {
+        Row: { conversation_id: string; member_kind: string; member_id: string; member_name: string; updated_at: string };
+        Insert: Partial<Database["public"]["Tables"]["conversation_typing"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["conversation_typing"]["Row"]>;
         Relationships: [];
       };
       chat_messages: {

@@ -4,7 +4,8 @@ import { requireStudentAuth, AuthenticatedRequest } from "../middleware/auth.js"
 import { rateLimit } from "../middleware/rateLimit.js";
 import { canTeach } from "../services/staffValidation.js";
 import { callMode } from "../services/messagingPolicy.js";
-import { Viewer, studentViewer, listConversations, listMessages, sendMessage, markRead, createProgrammeGroup, createClassGroup, startDirectChat, listTeachableClasses, listStudentDirectory, startStudentChat, createCallLink } from "../services/messagingService.js";
+import { deleteScope, validateReaction } from "../services/chatPolicy.js";
+import { Viewer, studentViewer, listConversations, listMessages, sendMessage, markRead, createProgrammeGroup, createClassGroup, startDirectChat, listTeachableClasses, listStudentDirectory, startStudentChat, createCallLink, deleteMessage, reactToMessage, removeReaction, setTyping, listTyping } from "../services/messagingService.js";
 
 function fail(res: Response, err: unknown, fallback: string) {
   const message = (err as Error).message || fallback;
@@ -20,7 +21,44 @@ function bodyOf(req: Request) {
   const file = b.file && b.file.base64 && b.file.contentType && b.file.fileName
     ? { base64: b.file.base64, contentType: b.file.contentType, fileName: b.file.fileName }
     : undefined;
-  return { body: b.body, voice, file };
+  const replyTo = typeof (b as { replyTo?: unknown }).replyTo === "string" ? (b as { replyTo: string }).replyTo : undefined;
+  return { body: b.body, voice, file, replyTo };
+}
+
+type ViewerOf = (req: Request) => Promise<Viewer>;
+
+/** Delete, reactions and typing, the same for students and staff. Each router passes in how to find the viewer. */
+function registerEssentials(router: Router, viewerOf: ViewerOf) {
+  router.delete("/messages/:messageId", async (req: Request, res: Response) => {
+    try {
+      const scope = deleteScope(req.query.scope);
+      if (!scope) return res.status(400).json({ error: "The scope must be 'me' or 'everyone'." });
+      res.json(await deleteMessage(await viewerOf(req), req.params.messageId, scope));
+    } catch (err) { fail(res, err, "Could not delete the message."); }
+  });
+
+  router.post("/messages/:messageId/reaction", async (req: Request, res: Response) => {
+    try {
+      const key = (req.body || {}).key;
+      if (!validateReaction(key)) return res.status(400).json({ error: "Choose one of the six reactions." });
+      res.json(await reactToMessage(await viewerOf(req), req.params.messageId, key));
+    } catch (err) { fail(res, err, "Could not react to the message."); }
+  });
+
+  router.delete("/messages/:messageId/reaction", async (req: Request, res: Response) => {
+    try { res.json(await removeReaction(await viewerOf(req), req.params.messageId)); }
+    catch (err) { fail(res, err, "Could not remove the reaction."); }
+  });
+
+  router.post("/conversations/:id/typing", async (req: Request, res: Response) => {
+    try { res.json(await setTyping(await viewerOf(req), req.params.id)); }
+    catch (err) { fail(res, err, "Could not send the typing signal."); }
+  });
+
+  router.get("/conversations/:id/typing", async (req: Request, res: Response) => {
+    try { res.json(await listTyping(await viewerOf(req), req.params.id)); }
+    catch (err) { fail(res, err, "Could not load typing."); }
+  });
 }
 
 export const studentMessagingRouter = Router();
@@ -141,3 +179,6 @@ staffMessagingRouter.post("/direct", async (req: Request, res: Response) => {
     res.json(await startDirectChat({ id: staff.id, name: staff.fullName, role: staff.role }, studentRowId));
   } catch (err) { fail(res, err, "Could not start the chat."); }
 });
+
+registerEssentials(studentMessagingRouter, async (req) => viewerOf(req as AuthenticatedRequest));
+registerEssentials(staffMessagingRouter, async (req) => staffViewer(req));

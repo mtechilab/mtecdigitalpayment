@@ -3,6 +3,7 @@ import { randomBytes } from "crypto";
 import { getSupabase } from "../db/supabaseClient.js";
 import { recordAudit } from "./auditLogService.js";
 import { validateText, validateVoice, unreadCount, callLinkUrl, CallMode } from "./messagingPolicy.js";
+import { isReadBy, previewOf, isTypingNow, ReactionKey } from "./chatPolicy.js";
 import { canTeach, isAdministratorRole } from "./staffValidation.js";
 
 export type Viewer =
@@ -131,32 +132,80 @@ export async function listConversations(viewer: Viewer) {
 export async function listMessages(viewer: Viewer, conversationId: string, after?: string) {
   await requireAccess(conversationId, viewer);
   const supabase = getSupabase();
-  let q = supabase.from("messages").select("id, sender_kind, sender_id, sender_name, kind, body, voice_path, voice_seconds, file_path, file_name, file_size, created_at")
+  let q = supabase.from("messages").select("id, sender_kind, sender_id, sender_name, kind, body, voice_path, voice_seconds, file_path, file_name, file_size, reply_to, deleted_for_everyone, created_at")
     .eq("conversation_id", conversationId).order("created_at", { ascending: true }).limit(100);
   if (after) q = q.gt("created_at", after);
   const { data, error } = await q;
   if (error) throw new Error(`listMessages failed: ${error.message}`);
+  const rows = (data || []) as unknown as {
+    id: string; sender_kind: string; sender_id: string; sender_name: string; kind: string; body: string | null;
+    voice_path: string | null; voice_seconds: number | null; file_path: string | null; file_name: string | null;
+    file_size: number | null; reply_to: string | null; deleted_for_everyone: boolean; created_at: string;
+  }[];
+  const ids = rows.map((r) => r.id);
+  if (ids.length === 0) return [];
+
+  // Messages this viewer deleted for themselves stay hidden for them only.
+  const { data: hiddenRows } = await supabase.from("message_hidden").select("message_id")
+    .eq("viewer_kind", viewer.kind).eq("viewer_id", viewer.id).in("message_id", ids);
+  const hidden = new Set(((hiddenRows || []) as unknown as { message_id: string }[]).map((h) => h.message_id));
+
+  // The message each reply quotes.
+  const replyIds = [...new Set(rows.map((r) => r.reply_to).filter((x): x is string => !!x))];
+  const quoted = new Map<string, { id: string; senderName: string; preview: string }>();
+  if (replyIds.length > 0) {
+    const { data: qs } = await supabase.from("messages").select("id, sender_name, kind, body, deleted_for_everyone").in("id", replyIds);
+    for (const m of (qs || []) as unknown as { id: string; sender_name: string; kind: string; body: string | null; deleted_for_everyone: boolean }[]) {
+      quoted.set(m.id, { id: m.id, senderName: m.sender_name, preview: previewOf(m.body, m.kind, m.deleted_for_everyone) });
+    }
+  }
+
+  // Reaction counts, and this viewer's own reaction.
+  const { data: reactionRows } = await supabase.from("message_reactions").select("message_id, reactor_kind, reactor_id, reaction").in("message_id", ids);
+  const counts = new Map<string, Record<string, number>>();
+  const mine = new Map<string, string>();
+  for (const r of (reactionRows || []) as unknown as { message_id: string; reactor_kind: string; reactor_id: string; reaction: string }[]) {
+    const c = counts.get(r.message_id) || {};
+    c[r.reaction] = (c[r.reaction] || 0) + 1;
+    counts.set(r.message_id, c);
+    if (r.reactor_kind === viewer.kind && r.reactor_id === viewer.id) mine.set(r.message_id, r.reaction);
+  }
+
+  // Read receipts: everyone's last-read time in this conversation.
+  const { data: readRows } = await supabase.from("conversation_reads").select("reader_kind, reader_id, last_read_at").eq("conversation_id", conversationId);
+  const readers = (readRows || []) as unknown as { reader_kind: string; reader_id: string; last_read_at: string }[];
+
   const out = [];
-  for (const m of data || []) {
+  for (const m of rows) {
+    if (hidden.has(m.id)) continue;
+    const deleted = m.deleted_for_everyone;
+    const mineMsg = m.sender_kind === viewer.kind && m.sender_id === viewer.id;
     let fileUrl: string | null = null;
-    if ((m.kind === "image" || m.kind === "file") && m.file_path) {
-      const { data: signed } = await supabase.storage.from("chat-files").createSignedUrl(m.file_path as string, SIGNED_SECONDS);
+    let voiceUrl: string | null = null;
+    if (!deleted && (m.kind === "image" || m.kind === "file") && m.file_path) {
+      const { data: signed } = await supabase.storage.from("chat-files").createSignedUrl(m.file_path, SIGNED_SECONDS);
       fileUrl = signed?.signedUrl || null;
     }
-    let voiceUrl: string | null = null;
-    if (m.kind === "voice" && m.voice_path) {
-      const { data: signed } = await supabase.storage.from("voice-notes").createSignedUrl(m.voice_path as string, SIGNED_SECONDS);
+    if (!deleted && m.kind === "voice" && m.voice_path) {
+      const { data: signed } = await supabase.storage.from("voice-notes").createSignedUrl(m.voice_path, SIGNED_SECONDS);
       voiceUrl = signed?.signedUrl || null;
     }
+    const readBy = mineMsg
+      ? readers.filter((r) => !(r.reader_kind === viewer.kind && r.reader_id === viewer.id) && isReadBy(r.last_read_at, m.created_at)).length
+      : null;
     out.push({
-      id: m.id, senderKind: m.sender_kind, senderName: m.sender_name, mine: m.sender_kind === viewer.kind && m.sender_id === viewer.id,
-      kind: m.kind, body: m.body, voiceUrl, voiceSeconds: m.voice_seconds, fileUrl, fileName: m.file_name, fileSize: m.file_size, createdAt: m.created_at,
+      id: m.id, senderKind: m.sender_kind, senderName: m.sender_name, mine: mineMsg, kind: m.kind,
+      deleted, body: deleted ? null : m.body, voiceUrl, voiceSeconds: deleted ? null : m.voice_seconds,
+      fileUrl, fileName: deleted ? null : m.file_name, fileSize: deleted ? null : m.file_size,
+      replyTo: m.reply_to ? quoted.get(m.reply_to) || null : null,
+      reactions: counts.get(m.id) || {}, myReaction: mine.get(m.id) || null,
+      readBy, createdAt: m.created_at,
     });
   }
   return out;
 }
 
-export async function sendMessage(viewer: Viewer, conversationId: string, input: { body?: string; voice?: { base64: string; contentType: string; seconds: number }; file?: { base64: string; contentType: string; fileName: string } }) {
+export async function sendMessage(viewer: Viewer, conversationId: string, input: { body?: string; voice?: { base64: string; contentType: string; seconds: number }; file?: { base64: string; contentType: string; fileName: string }; replyTo?: string }) {
   const conv = await requireAccess(conversationId, viewer);
   const supabase = getSupabase();
   const now = new Date().toISOString();
@@ -186,6 +235,14 @@ export async function sendMessage(viewer: Viewer, conversationId: string, input:
     row = { conversation_id: conversationId, sender_kind: viewer.kind, sender_id: viewer.id, sender_name: viewer.name, kind: "text", body: (input.body || "").trim() };
   }
 
+  if (input.replyTo) {
+    const { data: target } = await supabase.from("messages").select("id, conversation_id, deleted_for_everyone")
+      .eq("id", input.replyTo).maybeSingle();
+    if (!target || target.conversation_id !== conversationId || target.deleted_for_everyone) {
+      throw new Error("The message you are replying to is not available.");
+    }
+    row.reply_to = input.replyTo;
+  }
   const { data, error } = await supabase.from("messages").insert(row).select("id, created_at").single();
   if (error) throw new Error(`sendMessage failed: ${error.message}`);
   await supabase.from("conversations").update({ last_message_at: now }).eq("id", conv.id);
@@ -348,4 +405,83 @@ export async function createCallLink(viewer: Viewer, conversationId: string, mod
   const kind = mode === "audio" ? "voice" : "video";
   await sendMessage(viewer, conversationId, { body: `${viewer.name} started a ${kind} call. Join here: ${url}` });
   return { url };
+}
+
+async function messageIn(messageId: string) {
+  const { data, error } = await getSupabase().from("messages")
+    .select("id, conversation_id, sender_kind, sender_id, kind, voice_path, file_path, deleted_for_everyone")
+    .eq("id", messageId).maybeSingle();
+  if (error) throw new Error(`messageIn failed: ${error.message}`);
+  if (!data) throw new Error("That message was not found.");
+  return data as unknown as {
+    id: string; conversation_id: string; sender_kind: string; sender_id: string; kind: string;
+    voice_path: string | null; file_path: string | null; deleted_for_everyone: boolean;
+  };
+}
+
+/** "me": hidden for this viewer only. "everyone": removed for all, sender only, and the file is deleted. */
+export async function deleteMessage(viewer: Viewer, messageId: string, scope: "me" | "everyone") {
+  const supabase = getSupabase();
+  const msg = await messageIn(messageId);
+  await requireAccess(msg.conversation_id, viewer);
+  if (scope === "me") {
+    const { error } = await supabase.from("message_hidden").upsert(
+      { message_id: messageId, viewer_kind: viewer.kind, viewer_id: viewer.id },
+      { onConflict: "message_id,viewer_kind,viewer_id" });
+    if (error) throw new Error(`deleteMessage failed: ${error.message}`);
+    return { success: true };
+  }
+  if (!(msg.sender_kind === viewer.kind && msg.sender_id === viewer.id)) {
+    throw new Error("You can only delete your own messages for everyone.");
+  }
+  if (msg.deleted_for_everyone) return { success: true };
+  if (msg.voice_path) await supabase.storage.from("voice-notes").remove([msg.voice_path]);
+  if (msg.file_path) await supabase.storage.from("chat-files").remove([msg.file_path]);
+  const { error } = await supabase.from("messages").update({ deleted_for_everyone: true, body: "" }).eq("id", messageId);
+  if (error) throw new Error(`deleteMessage (update) failed: ${error.message}`);
+  return { success: true };
+}
+
+export async function reactToMessage(viewer: Viewer, messageId: string, reaction: ReactionKey) {
+  const msg = await messageIn(messageId);
+  await requireAccess(msg.conversation_id, viewer);
+  if (msg.deleted_for_everyone) throw new Error("You cannot react to a deleted message.");
+  const { error } = await getSupabase().from("message_reactions").upsert(
+    { message_id: messageId, reactor_kind: viewer.kind, reactor_id: viewer.id, reaction, created_at: new Date().toISOString() },
+    { onConflict: "message_id,reactor_kind,reactor_id" });
+  if (error) throw new Error(`reactToMessage failed: ${error.message}`);
+  return { success: true };
+}
+
+export async function removeReaction(viewer: Viewer, messageId: string) {
+  const msg = await messageIn(messageId);
+  await requireAccess(msg.conversation_id, viewer);
+  const { error } = await getSupabase().from("message_reactions").delete()
+    .eq("message_id", messageId).eq("reactor_kind", viewer.kind).eq("reactor_id", viewer.id);
+  if (error) throw new Error(`removeReaction failed: ${error.message}`);
+  return { success: true };
+}
+
+/** Called while the viewer is typing; the conversation shows them for a few seconds. */
+export async function setTyping(viewer: Viewer, conversationId: string) {
+  await requireAccess(conversationId, viewer);
+  const { error } = await getSupabase().from("conversation_typing").upsert(
+    { conversation_id: conversationId, member_kind: viewer.kind, member_id: viewer.id, member_name: viewer.name, updated_at: new Date().toISOString() },
+    { onConflict: "conversation_id,member_kind,member_id" });
+  if (error) throw new Error(`setTyping failed: ${error.message}`);
+  return { success: true };
+}
+
+/** The names of other people typing in this conversation right now. */
+export async function listTyping(viewer: Viewer, conversationId: string) {
+  await requireAccess(conversationId, viewer);
+  const { data, error } = await getSupabase().from("conversation_typing")
+    .select("member_kind, member_id, member_name, updated_at").eq("conversation_id", conversationId);
+  if (error) throw new Error(`listTyping failed: ${error.message}`);
+  const rows = (data || []) as unknown as { member_kind: string; member_id: string; member_name: string; updated_at: string }[];
+  return {
+    typing: rows
+      .filter((r) => isTypingNow(r.updated_at) && !(r.member_kind === viewer.kind && r.member_id === viewer.id))
+      .map((r) => r.member_name),
+  };
 }
