@@ -3,7 +3,7 @@ import { requireStaffAuth, StaffRequest } from "../middleware/staffAuth.js";
 import { requireStudentAuth, AuthenticatedRequest } from "../middleware/auth.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 import { canTeach } from "../services/staffValidation.js";
-import { Viewer, studentViewer, listConversations, listMessages, sendMessage, markRead, createProgrammeGroup, createClassGroup, startDirectChat } from "../services/messagingService.js";
+import { Viewer, studentViewer, listConversations, listMessages, sendMessage, markRead, createProgrammeGroup, createClassGroup, startDirectChat, listTeachableClasses } from "../services/messagingService.js";
 
 function fail(res: Response, err: unknown, fallback: string) {
   const message = (err as Error).message || fallback;
@@ -77,6 +77,14 @@ staffMessagingRouter.post("/conversations/:id/messages", rateLimit("msg-post", 1
 staffMessagingRouter.post("/conversations/:id/read", async (req: Request, res: Response) => {
   try { res.json(await markRead(staffViewer(req), req.params.id)); }
   catch (err) { fail(res, err, "Could not mark as read."); }
+});
+
+// The classes this staff member can open a group for, and whether each already has one.
+staffMessagingRouter.get("/classes", async (req: Request, res: Response) => {
+  try {
+    const staff = (req as StaffRequest).staff!;
+    res.json({ classes: await listTeachableClasses({ id: staff.id, name: staff.fullName, role: staff.role }) });
+  } catch (err) { fail(res, err, "Could not load your classes."); }
 });
 
 staffMessagingRouter.post("/groups/programme", async (req: Request, res: Response) => {

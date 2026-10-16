@@ -235,3 +235,38 @@ export async function startDirectChat(staff: { id: string; name: string; role: s
   if (memberError) throw new Error(`startDirectChat (members) failed: ${memberError.message}`);
   return { id: data.id, created: true };
 }
+
+/** The classes this staff member can open a group for: every class for an administrator,
+ *  otherwise the classes they teach. Each row says whether its group already exists. */
+export async function listTeachableClasses(staff: { id: string; name: string; role: string }) {
+  if (!canTeach(staff.role)) throw new Error("Only lecturers and administrators create class groups.");
+  const supabase = getSupabase();
+  let query = supabase.from("classes").select("id, instructor_name, course_id, academic_year")
+    .order("academic_year", { ascending: false }).limit(200);
+  if (!isAdministratorRole(staff.role)) query = query.ilike("instructor_name", staff.name);
+  const { data: classes, error } = await query;
+  if (error) throw new Error(`listTeachableClasses failed: ${error.message}`);
+  const rows = (classes || []) as unknown as { id: string; instructor_name: string; course_id: string; academic_year: string }[];
+
+  const courseIds = [...new Set(rows.map((r) => r.course_id))];
+  const courses = new Map<string, { code: string; name: string }>();
+  if (courseIds.length > 0) {
+    const { data: cs, error: cError } = await supabase.from("courses").select("id, code, name").in("id", courseIds);
+    if (cError) throw new Error(`listTeachableClasses (courses) failed: ${cError.message}`);
+    for (const c of (cs || []) as unknown as { id: string; code: string; name: string }[]) courses.set(c.id, { code: c.code, name: c.name });
+  }
+
+  const { data: groups } = await supabase.from("conversations").select("class_id").eq("kind", "class");
+  const withGroup = new Set(((groups || []) as unknown as { class_id: string | null }[]).map((g) => g.class_id));
+
+  return rows.map((r) => {
+    const course = courses.get(r.course_id);
+    return {
+      id: r.id,
+      label: `${course?.code || ""} ${course?.name || "Class"}`.trim(),
+      academicYear: r.academic_year,
+      instructorName: r.instructor_name,
+      hasGroup: withGroup.has(r.id),
+    };
+  });
+}
