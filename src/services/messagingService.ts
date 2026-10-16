@@ -1,3 +1,5 @@
+import { validateChatFile } from "./chatFilePolicy.js";
+import { randomBytes } from "crypto";
 import { getSupabase } from "../db/supabaseClient.js";
 import { recordAudit } from "./auditLogService.js";
 import { validateText, validateVoice, unreadCount } from "./messagingPolicy.js";
@@ -102,13 +104,25 @@ export async function listConversations(viewer: Viewer) {
     .eq("reader_kind", viewer.kind).eq("reader_id", viewer.id);
   const readAt = new Map(((reads || []) as Array<Record<string, any>>).map((r) => [r.conversation_id as string, r.last_read_at as string]));
 
+  // A direct chat is titled with the other person's name, from each viewer's side.
+  const directIds = list.filter((c) => c.kind === "direct").map((c) => c.id);
+  const directTitle = new Map<string, string>();
+  if (directIds.length > 0) {
+    const { data: members } = await supabase.from("conversation_members")
+      .select("conversation_id, member_kind, member_id, member_name").in("conversation_id", directIds);
+    for (const m of (members || []) as Array<Record<string, any>>) {
+      if (m.member_kind === viewer.kind && m.member_id === viewer.id) continue;
+      directTitle.set(m.conversation_id as string, m.member_name as string);
+    }
+  }
+
   const result = [];
   for (const c of list) {
     const since = readAt.get(c.id) || "1970-01-01T00:00:00Z";
     const { data: fresh } = await supabase.from("messages").select("sender_kind, sender_id")
       .eq("conversation_id", c.id).gt("created_at", since).limit(200);
     const unread = unreadCount(((fresh || []) as Array<Record<string, any>>).map((m) => ({ senderKind: m.sender_kind as string, senderId: m.sender_id as string })), viewer.kind, viewer.id);
-    result.push({ id: c.id, kind: c.kind, title: c.title, programme: c.programme, lastMessageAt: c.last_message_at, unread });
+    result.push({ id: c.id, kind: c.kind, title: directTitle.get(c.id) ?? c.title, programme: c.programme, lastMessageAt: c.last_message_at, unread });
   }
   return result;
 }
@@ -117,13 +131,18 @@ export async function listConversations(viewer: Viewer) {
 export async function listMessages(viewer: Viewer, conversationId: string, after?: string) {
   await requireAccess(conversationId, viewer);
   const supabase = getSupabase();
-  let q = supabase.from("messages").select("id, sender_kind, sender_id, sender_name, kind, body, voice_path, voice_seconds, created_at")
+  let q = supabase.from("messages").select("id, sender_kind, sender_id, sender_name, kind, body, voice_path, voice_seconds, file_path, file_name, file_size, created_at")
     .eq("conversation_id", conversationId).order("created_at", { ascending: true }).limit(100);
   if (after) q = q.gt("created_at", after);
   const { data, error } = await q;
   if (error) throw new Error(`listMessages failed: ${error.message}`);
   const out = [];
   for (const m of data || []) {
+    let fileUrl: string | null = null;
+    if ((m.kind === "image" || m.kind === "file") && m.file_path) {
+      const { data: signed } = await supabase.storage.from("chat-files").createSignedUrl(m.file_path as string, SIGNED_SECONDS);
+      fileUrl = signed?.signedUrl || null;
+    }
     let voiceUrl: string | null = null;
     if (m.kind === "voice" && m.voice_path) {
       const { data: signed } = await supabase.storage.from("voice-notes").createSignedUrl(m.voice_path as string, SIGNED_SECONDS);
@@ -131,19 +150,28 @@ export async function listMessages(viewer: Viewer, conversationId: string, after
     }
     out.push({
       id: m.id, senderKind: m.sender_kind, senderName: m.sender_name, mine: m.sender_kind === viewer.kind && m.sender_id === viewer.id,
-      kind: m.kind, body: m.body, voiceUrl, voiceSeconds: m.voice_seconds, createdAt: m.created_at,
+      kind: m.kind, body: m.body, voiceUrl, voiceSeconds: m.voice_seconds, fileUrl, fileName: m.file_name, fileSize: m.file_size, createdAt: m.created_at,
     });
   }
   return out;
 }
 
-export async function sendMessage(viewer: Viewer, conversationId: string, input: { body?: string; voice?: { base64: string; contentType: string; seconds: number } }) {
+export async function sendMessage(viewer: Viewer, conversationId: string, input: { body?: string; voice?: { base64: string; contentType: string; seconds: number }; file?: { base64: string; contentType: string; fileName: string } }) {
   const conv = await requireAccess(conversationId, viewer);
   const supabase = getSupabase();
   const now = new Date().toISOString();
   let row: Record<string, unknown>;
 
-  if (input.voice) {
+  if (input.file) {
+    const check = validateChatFile(input.file.contentType, input.file.fileName, input.file.base64);
+    if (!check.ok) throw new Error(check.error);
+    const path = `${conversationId}/${Date.now()}-${viewer.id}.${check.ext}`;
+    const { error: uploadError } = await supabase.storage.from("chat-files")
+      .upload(path, Buffer.from(input.file.base64, "base64"), { contentType: input.file.contentType, upsert: false });
+    if (uploadError) throw new Error(`Could not store the file: ${uploadError.message}`);
+    row = { conversation_id: conversationId, sender_kind: viewer.kind, sender_id: viewer.id, sender_name: viewer.name,
+      kind: check.kind, file_path: path, file_name: check.fileName, file_type: input.file.contentType, file_size: check.size };
+  } else if (input.voice) {
     const problem = validateVoice(input.voice.contentType, input.voice.base64, input.voice.seconds);
     if (problem) throw new Error(problem);
     const ext = input.voice.contentType.includes("ogg") ? "ogg" : input.voice.contentType.includes("webm") ? "webm" : input.voice.contentType.includes("3gpp") ? "3gp" : "m4a";
@@ -269,4 +297,54 @@ export async function listTeachableClasses(staff: { id: string; name: string; ro
       hasGroup: withGroup.has(r.id),
     };
   });
+}
+
+/** Students find other students to chat with. Only name and programme are shown, never contact details. */
+export async function listStudentDirectory(viewer: Viewer, query: string) {
+  if (viewer.kind !== "student") throw new Error("Only students use the student directory.");
+  const term = query.trim().slice(0, 60).replace(/[%_\\]/g, (c) => `\\${c}`);
+  let q = getSupabase().from("students").select("id, student_id, full_name, programme")
+    .eq("status", "active").neq("id", viewer.id).order("full_name", { ascending: true }).limit(20);
+  if (term) q = q.ilike("full_name", `%${term}%`);
+  const { data, error } = await q;
+  if (error) throw new Error(`listStudentDirectory failed: ${error.message}`);
+  return ((data || []) as Array<Record<string, any>>).map((r) => ({
+    id: r.id as string, studentId: r.student_id as string, name: r.full_name as string, programme: r.programme as string,
+  }));
+}
+
+/** A direct chat between two students. Reuses the existing chat between the same two students. */
+export async function startStudentChat(viewer: Viewer, otherStudentId: string) {
+  if (viewer.kind !== "student") throw new Error("Only students start student chats.");
+  if (otherStudentId === viewer.id) throw new Error("Choose another student.");
+  const other = await studentViewer(otherStudentId);
+  const supabase = getSupabase();
+  const { data: mine } = await supabase.from("conversation_members").select("conversation_id")
+    .eq("member_kind", "student").eq("member_id", viewer.id);
+  const ids = (mine || []).map((m) => m.conversation_id as string);
+  if (ids.length > 0) {
+    const { data: shared } = await supabase.from("conversation_members").select("conversation_id")
+      .eq("member_kind", "student").eq("member_id", other.id).in("conversation_id", ids).limit(1);
+    if (shared && shared.length > 0) return { id: shared[0].conversation_id as string, created: false };
+  }
+  const { data, error } = await supabase.from("conversations").insert({
+    kind: "direct", title: other.name, created_by_name: viewer.name,
+  }).select("id").single();
+  if (error) throw new Error(`startStudentChat failed: ${error.message}`);
+  const { error: memberError } = await supabase.from("conversation_members").insert([
+    { conversation_id: data.id, member_kind: "student", member_id: viewer.id, member_name: viewer.name },
+    { conversation_id: data.id, member_kind: "student", member_id: other.id, member_name: other.name },
+  ]);
+  if (memberError) throw new Error(`startStudentChat (members) failed: ${memberError.message}`);
+  return { id: data.id as string, created: true };
+}
+
+/** A web call link for a conversation's members, posted into the chat so everyone in it can join.
+ *  The room is a public video meeting; anyone who holds the link can join it. */
+export async function createCallLink(viewer: Viewer, conversationId: string) {
+  await requireAccess(conversationId, viewer);
+  const room = `MTeC-${conversationId.slice(0, 8)}-${randomBytes(6).toString("hex")}`;
+  const url = `https://meet.jit.si/${room}`;
+  await sendMessage(viewer, conversationId, { body: `${viewer.name} started a video call. Join here: ${url}` });
+  return { url };
 }

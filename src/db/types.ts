@@ -304,7 +304,7 @@ export interface Database {
         Relationships: [];
       };
       messages: {
-        Row: { id: string; conversation_id: string; sender_kind: string; sender_id: string; sender_name: string; kind: string; body: string | null; voice_path: string | null; voice_seconds: number | null; created_at: string };
+        Row: { id: string; conversation_id: string; sender_kind: string; sender_id: string; sender_name: string; kind: string; body: string | null; voice_path: string | null; voice_seconds: number | null; file_path: string | null; file_name: string | null; file_type: string | null; file_size: number | null; created_at: string };
         Insert: Partial<Database["public"]["Tables"]["messages"]["Row"]>;
         Update: Partial<Database["public"]["Tables"]["messages"]["Row"]>;
         Relationships: [];

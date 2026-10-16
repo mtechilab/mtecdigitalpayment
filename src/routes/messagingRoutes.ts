@@ -3,7 +3,7 @@ import { requireStaffAuth, StaffRequest } from "../middleware/staffAuth.js";
 import { requireStudentAuth, AuthenticatedRequest } from "../middleware/auth.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 import { canTeach } from "../services/staffValidation.js";
-import { Viewer, studentViewer, listConversations, listMessages, sendMessage, markRead, createProgrammeGroup, createClassGroup, startDirectChat, listTeachableClasses } from "../services/messagingService.js";
+import { Viewer, studentViewer, listConversations, listMessages, sendMessage, markRead, createProgrammeGroup, createClassGroup, startDirectChat, listTeachableClasses, listStudentDirectory, startStudentChat, createCallLink } from "../services/messagingService.js";
 
 function fail(res: Response, err: unknown, fallback: string) {
   const message = (err as Error).message || fallback;
@@ -12,11 +12,14 @@ function fail(res: Response, err: unknown, fallback: string) {
 }
 
 function bodyOf(req: Request) {
-  const b = req.body as { body?: string; voice?: { base64?: string; contentType?: string; seconds?: number } };
+  const b = req.body as { body?: string; voice?: { base64?: string; contentType?: string; seconds?: number }; file?: { base64?: string; contentType?: string; fileName?: string } };
   const voice = b.voice && b.voice.base64 && b.voice.contentType
     ? { base64: b.voice.base64, contentType: b.voice.contentType, seconds: Number(b.voice.seconds) }
     : undefined;
-  return { body: b.body, voice };
+  const file = b.file && b.file.base64 && b.file.contentType && b.file.fileName
+    ? { base64: b.file.base64, contentType: b.file.contentType, fileName: b.file.fileName }
+    : undefined;
+  return { body: b.body, voice, file };
 }
 
 export const studentMessagingRouter = Router();
@@ -41,6 +44,26 @@ studentMessagingRouter.get("/conversations/:id/messages", async (req: Authentica
 studentMessagingRouter.post("/conversations/:id/messages", rateLimit("msg-post", 120, 60 * 60 * 1000), async (req: AuthenticatedRequest, res: Response) => {
   try { res.json({ success: true, ...(await sendMessage(await viewerOf(req), req.params.id, bodyOf(req))) }); }
   catch (err) { fail(res, err, "Could not send the message."); }
+});
+
+studentMessagingRouter.get("/students", async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const q = typeof req.query.q === "string" ? req.query.q : "";
+    res.json({ students: await listStudentDirectory(await viewerOf(req), q) });
+  } catch (err) { fail(res, err, "Could not search students."); }
+});
+
+studentMessagingRouter.post("/direct", async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { studentRowId } = req.body as { studentRowId?: string };
+    if (!studentRowId) return res.status(400).json({ error: "studentRowId is required." });
+    res.json(await startStudentChat(await viewerOf(req), studentRowId));
+  } catch (err) { fail(res, err, "Could not start the chat."); }
+});
+
+studentMessagingRouter.post("/conversations/:id/call-link", async (req: AuthenticatedRequest, res: Response) => {
+  try { res.json({ success: true, ...(await createCallLink(await viewerOf(req), req.params.id)) }); }
+  catch (err) { fail(res, err, "Could not start the call."); }
 });
 
 studentMessagingRouter.post("/conversations/:id/read", async (req: AuthenticatedRequest, res: Response) => {
@@ -72,6 +95,11 @@ staffMessagingRouter.get("/conversations/:id/messages", async (req: Request, res
 staffMessagingRouter.post("/conversations/:id/messages", rateLimit("msg-post", 120, 60 * 60 * 1000), async (req: Request, res: Response) => {
   try { res.json({ success: true, ...(await sendMessage(staffViewer(req), req.params.id, bodyOf(req))) }); }
   catch (err) { fail(res, err, "Could not send the message."); }
+});
+
+staffMessagingRouter.post("/conversations/:id/call-link", async (req: Request, res: Response) => {
+  try { res.json({ success: true, ...(await createCallLink(staffViewer(req), req.params.id)) }); }
+  catch (err) { fail(res, err, "Could not start the call."); }
 });
 
 staffMessagingRouter.post("/conversations/:id/read", async (req: Request, res: Response) => {
