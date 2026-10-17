@@ -136,3 +136,6 @@ Run migration 024 after 023.
 Admins add, update, archive, restore, and delete library material.
 Endpoints: POST /api/library/admin (add, published at once), POST /api/library/admin/:id/update, POST /api/library/admin/:id/archive {archived: true|false}, DELETE /api/library/admin/:id (permanent, removes the stored files).
 Archived items are hidden from students and kept for the record. Run migration 025 after 024.
+
+## Call heartbeat (migration 026)
+A live call is kept open only while its people keep checking in. A call with no check-in for 30 seconds is closed automatically, so a crashed call cannot block the chat. Run migration 026 after 025.

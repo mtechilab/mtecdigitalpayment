@@ -1,6 +1,8 @@
 /** In-app call rules. No database or network imports, so they can be tested directly. */
 export const RING_SECONDS = 60;
 export const MAX_SIGNAL_CHARS = 20000;
+/** A live call is checked by both phones about every 1.5 seconds; silence for longer means it has ended. */
+export const HEARTBEAT_SECONDS = 30;
 export const SIGNAL_KINDS = ["offer", "answer", "ice", "hangup"] as const;
 
 export type IceServer = { urls: string | string[]; username?: string; credential?: string };
@@ -43,4 +45,9 @@ export function parseIceServers(raw: string | undefined): IceServer[] {
   } catch {
     return DEFAULT_ICE_SERVERS;
   }
+}
+
+export function isHeartbeatStale(lastSeen: string | null, now: Date = new Date()): boolean {
+  if (!lastSeen) return true;
+  return now.getTime() - new Date(lastSeen).getTime() > HEARTBEAT_SECONDS * 1000;
 }

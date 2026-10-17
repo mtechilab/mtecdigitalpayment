@@ -1,6 +1,6 @@
 import { getSupabase } from "../db/supabaseClient.js";
 import { Viewer, studentViewer } from "./messagingService.js";
-import { isRingExpired, durationSeconds, validateCallMode, validateSignal } from "./callPolicy.js";
+import { isRingExpired, isHeartbeatStale, durationSeconds, validateCallMode, validateSignal } from "./callPolicy.js";
 
 interface CallRow {
   id: string; conversation_id: string; caller_kind: string; caller_id: string; caller_name: string;
@@ -44,16 +44,34 @@ async function otherInDirectChat(viewer: Viewer, conversationId: string) {
   return { kind: other.member_kind, id: other.member_id, name: other.member_name };
 }
 
+/** Closes calls that can no longer be live: unanswered ones past the ring window, and answered ones
+ *  whose people have stopped checking in. This is what stops a crashed call from blocking the chat. */
+async function clearStaleCalls(conversationId: string) {
+  const supabase = getSupabase();
+  const { data } = await supabase.from("calls").select("id, status, created_at, answered_at, last_seen_at")
+    .eq("conversation_id", conversationId).in("status", ["ringing", "active"]);
+  const now = new Date();
+  const rows = (data || []) as unknown as { id: string; status: string; created_at: string; answered_at: string | null; last_seen_at: string | null }[];
+  for (const c of rows) {
+    if (c.status === "ringing" && isRingExpired(c.created_at, now)) {
+      await supabase.from("calls").update({ status: "cancelled", ended_at: now.toISOString() }).eq("id", c.id);
+    } else if (c.status === "active" && isHeartbeatStale(c.last_seen_at, now)) {
+      const endedAt = now.toISOString();
+      const duration = durationSeconds(c.answered_at || c.created_at, endedAt);
+      await supabase.from("calls").update({ status: "ended", ended_at: endedAt, duration_seconds: duration }).eq("id", c.id);
+    }
+  }
+}
+
 export async function startCall(viewer: Viewer, conversationId: string, mode: unknown) {
   if (!validateCallMode(mode)) throw new Error("Choose a voice or video call.");
   const other = await otherInDirectChat(viewer, conversationId);
   const supabase = getSupabase();
 
-  const { data: open } = await supabase.from("calls").select("id, status, created_at")
+  await clearStaleCalls(conversationId);
+  const { data: open } = await supabase.from("calls").select("id")
     .eq("conversation_id", conversationId).in("status", ["ringing", "active"]);
-  const live = ((open || []) as unknown as { status: string; created_at: string }[])
-    .filter((c) => c.status === "active" || !isRingExpired(c.created_at));
-  if (live.length > 0) throw new Error("A call is already in progress in this chat.");
+  if ((open || []).length > 0) throw new Error("A call is already in progress in this chat.");
 
   const { data, error } = await supabase.from("calls").insert({
     conversation_id: conversationId, caller_kind: viewer.kind, caller_id: viewer.id, caller_name: viewer.name,
@@ -79,6 +97,10 @@ export async function incomingCalls(viewer: Viewer) {
 export async function callState(viewer: Viewer, callId: string) {
   const call = await loadCall(callId);
   const role = participantRole(call, viewer);
+  // Each status check is the heartbeat that keeps a live call open.
+  if (call.status === "active" || call.status === "ringing") {
+    await getSupabase().from("calls").update({ last_seen_at: new Date().toISOString() }).eq("id", callId);
+  }
   return {
     callId: call.id, status: call.status, mode: call.mode, role,
     answeredAt: call.answered_at, endedAt: call.ended_at, durationSeconds: call.duration_seconds,
@@ -94,7 +116,7 @@ export async function answerCall(viewer: Viewer, callId: string) {
     throw new Error("This call has timed out.");
   }
   const now = new Date().toISOString();
-  const { error } = await getSupabase().from("calls").update({ status: "active", answered_at: now }).eq("id", callId);
+  const { error } = await getSupabase().from("calls").update({ status: "active", answered_at: now, last_seen_at: now }).eq("id", callId);
   if (error) throw new Error(`answerCall failed: ${error.message}`);
   return { callId, status: "active" };
 }

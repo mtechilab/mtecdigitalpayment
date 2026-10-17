@@ -809,3 +809,8 @@ alter table conversations add column if not exists created_by_id uuid;
 -- Admin library management (migration 025)
 -- Admin management of library material: archiving hides an item from students but keeps it.
 alter table library_items add column if not exists archived_at timestamptz;
+
+-- Call heartbeat (migration 026)
+-- A live call is kept only while its people are still connected. Each status check updates this time;
+-- a call whose time is old is closed, so a crashed or disconnected call cannot block new calls.
+alter table calls add column if not exists last_seen_at timestamptz;

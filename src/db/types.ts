@@ -334,7 +334,7 @@ export interface Database {
         Relationships: [];
       };
       calls: {
-        Row: { id: string; conversation_id: string; caller_kind: string; caller_id: string; caller_name: string; callee_kind: string; callee_id: string; mode: string; status: string; created_at: string; answered_at: string | null; ended_at: string | null; duration_seconds: number | null };
+        Row: { id: string; conversation_id: string; caller_kind: string; caller_id: string; caller_name: string; callee_kind: string; callee_id: string; mode: string; status: string; created_at: string; answered_at: string | null; ended_at: string | null; duration_seconds: number | null; last_seen_at: string | null };
         Insert: Partial<Database["public"]["Tables"]["calls"]["Row"]>;
         Update: Partial<Database["public"]["Tables"]["calls"]["Row"]>;
         Relationships: [];
