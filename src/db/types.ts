@@ -179,7 +179,7 @@ export interface Database {
       };
       applications: {
         Row: {
-          id: string; application_number: string | null; pin_id: string; status: string;
+          id: string; programme_level: string | null; application_number: string | null; pin_id: string; status: string;
           full_name: string; other_name: string; gender: string; date_of_birth: string; nationality: string;
           phone: string; whatsapp: string; email: string; address: string; district: string; city_town: string;
           academic_year: string; intake: string; programme: string; study_mode: string;
@@ -238,7 +238,7 @@ export interface Database {
         Relationships: [];
       };
       library_items: {
-        Row: { id: string; title: string; description: string; programme: string; course_code: string; semester: string; academic_year: string; topic: string; material_type: string; status: string; uploaded_by_staff_id: string | null; uploaded_by_name: string; current_version: number; published_version: number | null; published_at: string | null; approved_by: string | null; rejection_reason: string | null; archived_at: string | null; created_at: string };
+        Row: { id: string; title: string; description: string; programme: string; course_code: string; semester: string; academic_year: string; topic: string; material_type: string; status: string; uploaded_by_staff_id: string | null; uploaded_by_name: string; current_version: number; published_version: number | null; published_at: string | null; approved_by: string | null; rejection_reason: string | null; created_at: string };
         Insert: Partial<Database["public"]["Tables"]["library_items"]["Row"]>;
         Update: Partial<Database["public"]["Tables"]["library_items"]["Row"]>;
         Relationships: [];
@@ -334,7 +334,7 @@ export interface Database {
         Relationships: [];
       };
       calls: {
-        Row: { id: string; conversation_id: string; caller_kind: string; caller_id: string; caller_name: string; callee_kind: string; callee_id: string; mode: string; status: string; created_at: string; answered_at: string | null; ended_at: string | null; duration_seconds: number | null; last_seen_at: string | null };
+        Row: { id: string; conversation_id: string; caller_kind: string; caller_id: string; caller_name: string; callee_kind: string; callee_id: string; mode: string; status: string; created_at: string; answered_at: string | null; ended_at: string | null; duration_seconds: number | null };
         Insert: Partial<Database["public"]["Tables"]["calls"]["Row"]>;
         Update: Partial<Database["public"]["Tables"]["calls"]["Row"]>;
         Relationships: [];
@@ -343,6 +343,18 @@ export interface Database {
         Row: { id: number; call_id: string; from_kind: string; from_id: string; to_kind: string; to_id: string; kind: string; payload: unknown; created_at: string };
         Insert: Partial<Database["public"]["Tables"]["call_signals"]["Row"]>;
         Update: Partial<Database["public"]["Tables"]["call_signals"]["Row"]>;
+        Relationships: [];
+      };
+      application_fees: {
+        Row: { level: string; amount: number; updated_at: string; updated_by: string | null };
+        Insert: Partial<Database["public"]["Tables"]["application_fees"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["application_fees"]["Row"]>;
+        Relationships: [];
+      };
+      application_payments: {
+        Row: { id: string; application_id: string; method: string; amount: number; reference: string | null; receipt_path: string | null; receipt_type: string | null; status: string; review_reason: string | null; submitted_at: string; reviewed_at: string | null; reviewed_by: string | null };
+        Insert: Partial<Database["public"]["Tables"]["application_payments"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["application_payments"]["Row"]>;
         Relationships: [];
       };
       chat_messages: {

@@ -132,10 +132,8 @@ Students and staff create groups and add active students or staff members (up to
 Endpoints (students: /api/messages/student, staff: /api/messages/staff): POST /groups/custom {name, members:[{kind,id}]}, GET /conversations/:id/members, POST /conversations/:id/members {kind,id}, POST /conversations/:id/members/remove {kind,id}.
 Run migration 024 after 023.
 
-## Admin library management (migration 025)
-Admins add, update, archive, restore, and delete library material.
-Endpoints: POST /api/library/admin (add, published at once), POST /api/library/admin/:id/update, POST /api/library/admin/:id/archive {archived: true|false}, DELETE /api/library/admin/:id (permanent, removes the stored files).
-Archived items are hidden from students and kept for the record. Run migration 025 after 024.
-
-## Call heartbeat (migration 026)
-A live call is kept open only while its people keep checking in. A call with no check-in for 30 seconds is closed automatically, so a crashed call cannot block the chat. Run migration 026 after 025.
+## Online application payments (migration 027)
+Fees by level: Certificate and Diploma, set by the admin (default 100 and 200). Applicants pay to +232 76 866 665 by Orange Money with the transaction reference, or by cash with a receipt photo.
+Applicant portal (PIN and application number, sent in the body): POST /api/application-payments/portal/status and /portal/payment. Public fees: GET /api/application-payments/fees.
+Admin: GET/POST /api/application-payments/admin/fees, GET /admin/payments/pending, GET /admin/payments/:id/receipt, POST /admin/payments/:id/review {decision: verify|reject, reason}.
+The application form now requires programmeLevel and returns the application number and PIN.

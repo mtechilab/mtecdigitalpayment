@@ -806,11 +806,37 @@ alter table conversations add column if not exists created_by_student_id uuid re
 alter table conversations add column if not exists created_by_kind text check (created_by_kind in ('student', 'staff'));
 alter table conversations add column if not exists created_by_id uuid;
 
--- Admin library management (migration 025)
--- Admin management of library material: archiving hides an item from students but keeps it.
-alter table library_items add column if not exists archived_at timestamptz;
+-- Application fees and payments (migration 027)
+-- Application fees: set by the admin per programme level. Applicants pay to the Orange Money number
+-- shown on the form, or pay cash and upload a receipt. Payments are reviewed before the application is decided.
+create table if not exists application_fees (
+  level text primary key check (level in ('certificate', 'diploma')),
+  amount numeric not null check (amount > 0),
+  updated_at timestamptz not null default now(),
+  updated_by text
+);
+insert into application_fees (level, amount) values ('certificate', 100), ('diploma', 200) on conflict (level) do nothing;
 
--- Call heartbeat (migration 026)
--- A live call is kept only while its people are still connected. Each status check updates this time;
--- a call whose time is old is closed, so a crashed or disconnected call cannot block new calls.
-alter table calls add column if not exists last_seen_at timestamptz;
+alter table applications add column if not exists programme_level text check (programme_level in ('certificate', 'diploma'));
+
+create table if not exists application_payments (
+  id uuid primary key default gen_random_uuid(),
+  application_id uuid not null references applications(id) on delete cascade,
+  method text not null check (method in ('orange_money', 'cash')),
+  amount numeric not null check (amount > 0),
+  reference text,
+  receipt_path text,
+  receipt_type text,
+  status text not null default 'pending' check (status in ('pending', 'verified', 'rejected')),
+  review_reason text,
+  submitted_at timestamptz not null default now(),
+  reviewed_at timestamptz,
+  reviewed_by text,
+  check ((method <> 'orange_money') or (reference is not null)),
+  check ((method <> 'cash') or (receipt_path is not null))
+);
+create index if not exists idx_application_payments_app on application_payments (application_id, status);
+
+alter table application_fees enable row level security;
+alter table application_payments enable row level security;
+insert into storage.buckets (id, name, public) values ('application-receipts', 'application-receipts', false) on conflict (id) do nothing;

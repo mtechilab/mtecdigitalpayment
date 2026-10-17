@@ -3,7 +3,7 @@ import { Router, Request, Response, NextFunction } from "express";
 import { requireStaffAuth, StaffRequest } from "../middleware/staffAuth.js";
 import { requireStudentAuth, AuthenticatedRequest } from "../middleware/auth.js";
 import { requireAdminAuth, AdminRequest } from "../middleware/adminAuth.js";
-import { createLibraryItem, addLibraryVersion, approveLibraryItem, rejectLibraryItem, listLibrary, getLibraryDownload, LibraryFilters, createLibraryItemByAdmin, updateLibraryItemDetails, setLibraryItemArchived, deleteLibraryItem } from "../services/libraryService.js";
+import { createLibraryItem, addLibraryVersion, approveLibraryItem, rejectLibraryItem, listLibrary, getLibraryDownload, LibraryFilters } from "../services/libraryService.js";
 
 function filtersFrom(query: Request["query"]): LibraryFilters {
   const pick = (k: string) => (typeof query[k] === "string" ? (query[k] as string).trim().slice(0, 120) : undefined);
@@ -108,40 +108,6 @@ adminLibraryRouter.post("/:id/reject", async (req: AdminRequest, res: Response) 
     const { reason } = req.body as { reason?: string };
     res.json(await rejectLibraryItem(req.adminUsername || "admin", req.params.id, reason || ""));
   } catch (err) { fail(res, err, "Could not reject the material."); }
-});
-
-adminLibraryRouter.post("/", async (req: AdminRequest, res: Response) => {
-  try {
-    const b = req.body as Record<string, string | undefined>;
-    res.json(await createLibraryItemByAdmin(req.adminUsername || "admin", {
-      title: b.title || "", description: b.description, programme: b.programme || "", courseCode: b.courseCode,
-      semester: b.semester, academicYear: b.academicYear || "", topic: b.topic,
-      fileName: b.fileName || "", contentType: b.contentType || "", fileBase64: b.fileBase64 || "",
-    }));
-  } catch (err) { fail(res, err, "Could not add the material."); }
-});
-
-adminLibraryRouter.post("/:id/update", async (req: AdminRequest, res: Response) => {
-  try {
-    const b = req.body as Record<string, string | undefined>;
-    res.json(await updateLibraryItemDetails(req.adminUsername || "admin", req.params.id, {
-      title: b.title, description: b.description, programme: b.programme, courseCode: b.courseCode,
-      semester: b.semester, academicYear: b.academicYear, topic: b.topic,
-    }));
-  } catch (err) { fail(res, err, "Could not update the material."); }
-});
-
-adminLibraryRouter.post("/:id/archive", async (req: AdminRequest, res: Response) => {
-  try {
-    const { archived } = req.body as { archived?: boolean };
-    if (typeof archived !== "boolean") return res.status(400).json({ error: "archived must be true or false." });
-    res.json(await setLibraryItemArchived(req.adminUsername || "admin", req.params.id, archived));
-  } catch (err) { fail(res, err, "Could not change the material."); }
-});
-
-adminLibraryRouter.delete("/:id", async (req: AdminRequest, res: Response) => {
-  try { res.json(await deleteLibraryItem(req.adminUsername || "admin", req.params.id)); }
-  catch (err) { fail(res, err, "Could not delete the material."); }
 });
 
 adminLibraryRouter.get("/:id/download", async (req: Request, res: Response) => {

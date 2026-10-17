@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { validateCallMode, validateSignal, isRingExpired, durationSeconds, parseIceServers, DEFAULT_ICE_SERVERS, isHeartbeatStale } from "../src/services/callPolicy.ts";
+import { validateCallMode, validateSignal, isRingExpired, durationSeconds, parseIceServers, DEFAULT_ICE_SERVERS } from "../src/services/callPolicy.ts";
 
 test("only audio and video calls are accepted", () => {
   assert.equal(validateCallMode("audio"), true);
@@ -32,11 +32,4 @@ test("ICE settings fall back to STUN when missing or malformed", () => {
   assert.deepEqual(parseIceServers("[{\"urls\": 5}]"), DEFAULT_ICE_SERVERS);
   const relay = '[{"urls":"turn:relay.example:3478","username":"u","credential":"c"}]';
   assert.equal(parseIceServers(relay)[0].urls, "turn:relay.example:3478");
-});
-
-test("a call with no recent heartbeat is stale; a recent one is live", () => {
-  const now = new Date("2026-10-17T10:01:00Z");
-  assert.equal(isHeartbeatStale("2026-10-17T10:00:50Z", now), false);
-  assert.equal(isHeartbeatStale("2026-10-17T09:59:00Z", now), true);
-  assert.equal(isHeartbeatStale(null, now), true);
 });
