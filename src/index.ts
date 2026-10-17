@@ -76,6 +76,11 @@ app.get("/admin", (_req, res) => {
   res.sendFile(path.join(__dirname, "..", "public", "admin.html"));
 });
 
+// The public application form, in the same layout as the paper form.
+app.get("/apply", (_req, res) => {
+  res.sendFile(path.join(__dirname, "..", "public", "apply.html"));
+});
+
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 
 const port = process.env.PORT || 4000;

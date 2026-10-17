@@ -1,8 +1,9 @@
+import { streamApplicantLetter } from "../services/applicantLetterService.js";
 import { Router, Request, Response } from "express";
 import { requireAdminAuth, AdminRequest } from "../middleware/adminAuth.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 import {
-  getFees, applicantStatus, submitApplicantPayment, setFee, listPendingPayments, receiptLink, reviewPayment,
+  getFees, applicantStatus, submitApplicantPayment, setFee, listPendingPayments, receiptLink, reviewPayment, acceptApplication,
 } from "../services/applicationPaymentService.js";
 
 function fail(res: Response, err: unknown, fallback: string) {
@@ -67,4 +68,21 @@ applicationPaymentRouter.post("/admin/payments/:id/review", requireAdminAuth, as
     const { decision, reason } = (req.body || {}) as { decision?: unknown; reason?: unknown };
     res.json(await reviewPayment(req.adminUsername || "admin", req.params.id, decision, reason));
   } catch (err) { fail(res, err, "Could not review the payment."); }
+});
+
+// Applicant portal: the acceptance letter, once accepted. Sent as a PDF to download and share.
+applicationPaymentRouter.post("/portal/letter", rateLimit("app-portal-letter", 20, 15 * 60 * 1000), async (req: Request, res: Response) => {
+  try {
+    const { applicationNumber, pin } = (req.body || {}) as { applicationNumber?: string; pin?: string };
+    if (!applicationNumber || !pin) return res.status(400).json({ error: "Enter your application number and PIN." });
+    await streamApplicantLetter(applicationNumber, pin, res);
+  } catch (err) {
+    if (!res.headersSent) fail(res, err, "Could not create your letter.");
+  }
+});
+
+// Admin: accept an application once its fee is verified. Rejection uses the existing reject endpoint.
+applicationPaymentRouter.post("/admin/applications/:id/accept", requireAdminAuth, async (req: AdminRequest, res: Response) => {
+  try { res.json(await acceptApplication(req.adminUsername || "admin", req.params.id)); }
+  catch (err) { fail(res, err, "Could not accept the application."); }
 });

@@ -840,3 +840,10 @@ create index if not exists idx_application_payments_app on application_payments 
 alter table application_fees enable row level security;
 alter table application_payments enable row level security;
 insert into storage.buckets (id, name, public) values ('application-receipts', 'application-receipts', false) on conflict (id) do nothing;
+
+-- Application form fields (migration 028)
+-- Application form fields from the paper form: enrollment category, parent or guardian, and the declaration.
+alter table applications add column if not exists enrollment_category text check (enrollment_category in ('self_funded', 'sponsored'));
+alter table applications add column if not exists guardian jsonb not null default '{}';
+alter table applications add column if not exists declaration_name text;
+alter table applications add column if not exists declaration_date text;

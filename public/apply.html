@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MTeC Student Application</title>
+<style>
+  :root { --navy:#0b4aa0; --blue:#1d6fd6; --light:#eaf2fc; --ink:#0d1b3d; --line:#9db9e0; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: Arial, Helvetica, sans-serif; color:var(--ink); background:#f4f7fb; }
+  header { background:#fff; border-bottom:6px solid var(--navy); padding:16px 20px; }
+  header h1 { margin:0; font-size:20px; color:var(--navy); }
+  header p { margin:4px 0 0; color:#1d6fd6; font-style:italic; }
+  .wrap { max-width:860px; margin:0 auto; padding:16px; }
+  .band { background:var(--navy); color:#fff; padding:10px 14px; font-weight:bold; border-radius:6px 6px 0 0; margin-top:18px; }
+  .card { background:#fff; border:1px solid var(--line); border-top:none; border-radius:0 0 6px 6px; padding:14px; }
+  .row { display:flex; flex-wrap:wrap; gap:12px; margin-bottom:12px; }
+  .field { flex:1 1 220px; display:flex; flex-direction:column; }
+  .field label { font-size:13px; color:var(--navy); font-weight:bold; margin-bottom:4px; }
+  input, select, textarea { font-size:16px; padding:10px; border:1px solid var(--line); border-radius:4px; width:100%; }
+  .check { display:flex; align-items:center; gap:8px; margin-right:18px; }
+  .check input { width:auto; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  td, th { border:1px solid var(--line); padding:4px; text-align:left; }
+  td input { font-size:14px; padding:6px; }
+  button { background:var(--blue); color:#fff; border:0; padding:14px 20px; font-size:16px; border-radius:6px; cursor:pointer; }
+  button:disabled { background:#8aa; }
+  .note { background:var(--light); border-left:4px solid var(--blue); padding:10px; margin:10px 0; font-size:14px; }
+  .error { background:#fde8e8; color:#8a1111; border-left:4px solid #c0392b; padding:10px; margin:10px 0; display:none; }
+  .success { background:#e6f6ea; border-left:4px solid #1e8449; padding:12px; margin:10px 0; display:none; }
+  .pin { font-size:22px; font-weight:bold; letter-spacing:2px; color:var(--navy); }
+  .hidden { display:none; }
+  @media (max-width:560px) { header h1 { font-size:17px; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>MAKENI TECHNICAL COLLEGE OF INNOVATIVE TECHNOLOGY</h1>
+  <p>Skills for Innovation &middot; 53 Station Road, opposite the Light Center, Makeni &middot; +232 76 866 665</p>
+</header>
+<div class="wrap">
+  <h2 style="color:var(--navy)">STUDENT APPLICATION FORM</h2>
+  <div class="error" id="err"></div>
+
+  <form id="form" novalidate>
+
+    <div class="band">1. APPLICANT'S INFORMATION</div>
+    <div class="card">
+      <div class="row">
+        <div class="field"><label>First name *</label><input id="firstName" required></div>
+        <div class="field"><label>Middle name</label><input id="middleName"></div>
+        <div class="field"><label>Last name *</label><input id="lastName" required></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Gender *</label>
+          <div><label class="check"><input type="radio" name="gender" value="Male" required> Male</label>
+          <label class="check"><input type="radio" name="gender" value="Female"> Female</label></div></div>
+        <div class="field"><label>Date of birth * (DD/MM/YYYY)</label><input id="dob" placeholder="DD/MM/YYYY" required></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Course / programme applied for *</label><input id="programme" required></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Programme level *</label>
+          <select id="level" required>
+            <option value="">Choose</option>
+            <option value="certificate">Certificate</option>
+            <option value="diploma">Diploma</option>
+          </select></div>
+        <div class="field"><label>Academic year *</label><input id="academicYear" value="2026/2027" required></div>
+        <div class="field"><label>Intake *</label><input id="intake" value="September" required></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Residential address *</label><input id="address" required></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>District</label><input id="district"></div>
+        <div class="field"><label>City / town</label><input id="cityTown"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Mobile number *</label><input id="phone" type="tel" required></div>
+        <div class="field"><label>Email address</label><input id="email" type="email"></div>
+      </div>
+    </div>
+
+    <div class="band">2. EDUCATIONAL HISTORY / BACKGROUND</div>
+    <div class="card">
+      <table id="educationTable">
+        <thead><tr><th>#</th><th>High school</th><th>Year graduated</th><th>Highest grade completed</th><th>Level / qualification</th><th>Graduated</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="note">Fill in up to five schools. Each school needs its year, highest grade, and qualification.</div>
+    </div>
+
+    <div class="band">3. ENROLLMENT CATEGORY</div>
+    <div class="card">
+      <label class="check"><input type="radio" name="enrollment" value="self_funded" required> Self-funded student</label>
+      <label class="check"><input type="radio" name="enrollment" value="sponsored"> Scholarship / sponsored student</label>
+    </div>
+
+    <div class="band">4. APPLICATION FEE / PAYMENT</div>
+    <div class="card">
+      <div class="note" id="feeNote">Choose a programme level to see the application fee.</div>
+      <p>After you submit, you will be shown your application number and PIN. You then pay the fee to <strong>+232 76 866 665</strong> by Orange Money, or by cash with a receipt photo.</p>
+    </div>
+
+    <div class="band">5. PARENT / GUARDIAN INFORMATION</div>
+    <div class="card">
+      <div class="row">
+        <div class="field"><label>Full name *</label><input id="gName" required></div>
+        <div class="field"><label>Contact number *</label><input id="gContact" required></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Address *</label><input id="gAddress" required></div>
+        <div class="field"><label>Relationship to applicant *</label><input id="gRelation" required></div>
+      </div>
+    </div>
+
+    <div class="band">6. APPLICANT DECLARATION</div>
+    <div class="card">
+      <p>I hereby declare that the information provided in this application form is true, complete and accurate to the best of my knowledge and belief. I understand that any false information may result in the rejection of my application or withdrawal of admission.</p>
+      <label class="check"><input type="checkbox" id="declare" required> I confirm the declaration above</label>
+      <div class="row">
+        <div class="field"><label>Applicant's signature (type your full name) *</label><input id="sigName" required></div>
+        <div class="field"><label>Date *</label><input id="sigDate" placeholder="DD/MM/YYYY" required></div>
+      </div>
+    </div>
+
+    <p><button type="submit" id="submitBtn">SUBMIT APPLICATION</button></p>
+  </form>
+
+  <div class="success" id="done">
+    <h3>Application received</h3>
+    <p>Application number: <span class="pin" id="appNo"></span></p>
+    <p>PIN: <span class="pin" id="appPin"></span></p>
+    <div class="note"><strong>Keep your application number and PIN.</strong> You need both to pay the fee, check your status, and download your letter.</div>
+    <h3>Pay the application fee</h3>
+    <p>Amount due: <strong id="feeDue"></strong> to <strong>+232 76 866 665</strong>.</p>
+    <div class="row">
+      <div class="field"><label>Payment method</label>
+        <select id="method"><option value="orange_money">Orange Money (enter the reference)</option><option value="cash">Cash (upload the receipt photo)</option></select></div>
+    </div>
+    <div class="row" id="refRow"><div class="field"><label>Orange Money transaction reference</label><input id="reference"></div></div>
+    <div class="row hidden" id="receiptRow"><div class="field"><label>Receipt photo (JPG, PNG or WEBP, up to 5 MB)</label><input id="receipt" type="file" accept="image/jpeg,image/png,image/webp"></div></div>
+    <p><button id="payBtn">SEND PAYMENT</button></p>
+    <div class="success" id="payDone"></div>
+    <div class="error" id="payErr"></div>
+
+    <h3>Check your status</h3>
+    <p><button id="statusBtn">CHECK STATUS</button></p>
+    <div class="note" id="statusText"></div>
+    <p><button id="letterBtn" class="hidden">DOWNLOAD MY ACCEPTANCE LETTER</button></p>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const FEES = {};
+let session = null;
+
+function showError(msg) { const e = $('err'); e.textContent = msg; e.style.display = 'block'; window.scrollTo(0, 0); }
+function clearError() { $('err').style.display = 'none'; }
+
+function buildEducation() {
+  const body = document.querySelector('#educationTable tbody');
+  for (let i = 1; i <= 5; i++) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td>' + i + '.</td>' +
+      '<td><input data-k="school"></td>' +
+      '<td><input data-k="yearGraduated"></td>' +
+      '<td><input data-k="highestGrade"></td>' +
+      '<td><input data-k="qualification"></td>' +
+      '<td><input type="checkbox" data-k="graduated"></td>';
+    body.appendChild(tr);
+  }
+}
+
+function readEducation() {
+  return Array.from(document.querySelectorAll('#educationTable tbody tr')).map((tr) => {
+    const get = (k) => tr.querySelector('[data-k="' + k + '"]');
+    return {
+      school: get('school').value.trim(),
+      yearGraduated: get('yearGraduated').value.trim(),
+      highestGrade: get('highestGrade').value.trim(),
+      qualification: get('qualification').value.trim(),
+      graduated: get('graduated').checked,
+    };
+  });
+}
+
+async function loadFees() {
+  try {
+    const res = await fetch('/api/application-payments/fees');
+    const data = await res.json();
+    (data.fees || []).forEach((f) => { FEES[f.level] = f.amount; });
+  } catch (e) { /* the fee note stays generic */ }
+}
+
+function updateFeeNote() {
+  const level = $('level').value;
+  if (!level) { $('feeNote').textContent = 'Choose a programme level to see the application fee.'; return; }
+  const amount = FEES[level];
+  $('feeNote').textContent = amount ? 'Application fee for ' + (level === 'diploma' ? 'Diploma' : 'Certificate') + ': NLe ' + amount + '.' : 'The fee for this level is being confirmed.';
+}
+
+function checkedValue(name) {
+  const el = document.querySelector('input[name="' + name + '"]:checked');
+  return el ? el.value : '';
+}
+
+async function submitForm(e) {
+  e.preventDefault();
+  clearError();
+  if (!$('form').checkValidity()) { $('form').reportValidity(); return; }
+  const first = $('firstName').value.trim(), middle = $('middleName').value.trim(), last = $('lastName').value.trim();
+  const address = $('address').value.trim();
+  const payload = {
+    fullName: [first, middle, last].filter(Boolean).join(' '),
+    otherName: middle,
+    gender: checkedValue('gender'),
+    dateOfBirth: $('dob').value.trim(),
+    programme: $('programme').value.trim(),
+    programmeLevel: $('level').value,
+    academicYear: $('academicYear').value.trim(),
+    intake: $('intake').value.trim(),
+    studyMode: 'Full-time',
+    nationality: 'Sierra Leonean',
+    address: address,
+    district: $('district').value.trim(),
+    cityTown: $('cityTown').value.trim(),
+    phone: $('phone').value.trim(),
+    email: $('email').value.trim(),
+    education: readEducation(),
+    enrollmentCategory: checkedValue('enrollment'),
+    guardian: {
+      name: $('gName').value.trim(), contact: $('gContact').value.trim(),
+      address: $('gAddress').value.trim(), relationship: $('gRelation').value.trim(),
+    },
+    declarationConfirmed: $('declare').checked,
+    declarationName: $('sigName').value.trim(),
+    declarationDate: $('sigDate').value.trim(),
+  };
+  $('submitBtn').disabled = true;
+  try {
+    const res = await fetch('/applications/submit', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'The application could not be submitted.');
+    session = { applicationNumber: data.applicationNumber, pin: data.pin };
+    $('appNo').textContent = data.applicationNumber;
+    $('appPin').textContent = data.pin || '';
+    $('feeDue').textContent = 'NLe ' + (FEES[payload.programmeLevel] || '');
+    $('form').classList.add('hidden');
+    $('done').style.display = 'block';
+    window.scrollTo(0, 0);
+  } catch (err) {
+    showError(err.message);
+  } finally {
+    $('submitBtn').disabled = false;
+  }
+}
+
+function readFileBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(',')[1]);
+    reader.onerror = () => reject(new Error('The receipt could not be read.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function sendPayment() {
+  $('payErr').style.display = 'none'; $('payDone').style.display = 'none';
+  const body = { applicationNumber: session.applicationNumber, pin: session.pin, method: $('method').value };
+  try {
+    if (body.method === 'orange_money') {
+      body.reference = $('reference').value.trim();
+    } else {
+      const file = $('receipt').files[0];
+      if (!file) throw new Error('Choose a receipt photo first.');
+      body.receiptContentType = file.type;
+      body.receiptBase64 = await readFileBase64(file);
+    }
+    $('payBtn').disabled = true;
+    const res = await fetch('/api/application-payments/portal/payment', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'The payment could not be recorded.');
+    $('payDone').textContent = 'Payment sent. The admissions office will check it and tell you the result here.';
+    $('payDone').style.display = 'block';
+  } catch (err) {
+    $('payErr').textContent = err.message; $('payErr').style.display = 'block';
+  } finally {
+    $('payBtn').disabled = false;
+  }
+}
+
+async function checkStatus() {
+  try {
+    const res = await fetch('/api/application-payments/portal/status', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ applicationNumber: session.applicationNumber, pin: session.pin }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Could not load your status.');
+    let text = 'Status: ' + data.status.replace(/_/g, ' ') + '.';
+    if (data.paid) text += ' Application fee paid.';
+    else if (data.payments && data.payments.some((p) => p.status === 'pending')) text += ' Payment waiting for review.';
+    else if (data.payments && data.payments.some((p) => p.status === 'rejected')) text += ' A payment was rejected' + (data.payments.find((p) => p.status === 'rejected').reviewReason ? ': ' + data.payments.find((p) => p.status === 'rejected').reviewReason : '') + '. Please pay again.';
+    if (data.status === 'rejected' && data.rejectionReason) text += ' Reason: ' + data.rejectionReason;
+    $('statusText').textContent = text;
+    $('letterBtn').classList.toggle('hidden', !data.letterReady);
+  } catch (err) {
+    $('statusText').textContent = err.message;
+  }
+}
+
+async function downloadLetter() {
+  try {
+    const res = await fetch('/api/application-payments/portal/letter', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ applicationNumber: session.applicationNumber, pin: session.pin }),
+    });
+    if (!res.ok) { const data = await res.json(); throw new Error(data.error || 'The letter is not ready.'); }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'MTeC-acceptance-' + session.applicationNumber + '.pdf';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (err) {
+    $('statusText').textContent = err.message;
+  }
+}
+
+buildEducation();
+loadFees();
+$('level').addEventListener('change', updateFeeNote);
+$('form').addEventListener('submit', submitForm);
+$('method').addEventListener('change', () => {
+  const cash = $('method').value === 'cash';
+  $('refRow').classList.toggle('hidden', cash);
+  $('receiptRow').classList.toggle('hidden', !cash);
+});
+$('payBtn').addEventListener('click', sendPayment);
+$('statusBtn').addEventListener('click', checkStatus);
+$('letterBtn').addEventListener('click', downloadLetter);
+</script>
+</body>
+</html>

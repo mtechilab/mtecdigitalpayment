@@ -8,17 +8,17 @@ const BUCKET = "application-receipts";
 const LINK_SECONDS = 300;
 const WRONG_LOGIN = "The application number or PIN is not correct.";
 
-interface ApplicationRow {
+export interface ApplicationRow {
   id: string; application_number: string; status: string; full_name: string; programme: string;
-  programme_level: string | null; pin_id: string;
+  programme_level: string | null; pin_id: string; rejection_reason: string | null;
 }
 
 /** Checks the application number and PIN together. The same wrong-login message is used either way,
  *  so the portal does not reveal which of the two was wrong. */
-async function authenticate(applicationNumber: string, pin: string): Promise<ApplicationRow> {
+export async function authenticate(applicationNumber: string, pin: string): Promise<ApplicationRow> {
   const supabase = getSupabase();
   const { data: app, error } = await supabase.from("applications")
-    .select("id, application_number, status, full_name, programme, programme_level, pin_id")
+    .select("id, application_number, status, full_name, programme, programme_level, pin_id, rejection_reason")
     .eq("application_number", applicationNumber.trim()).maybeSingle();
   if (error) throw new Error(`authenticate failed: ${error.message}`);
   const row = app as unknown as ApplicationRow | null;
@@ -66,6 +66,8 @@ export async function applicantStatus(applicationNumber: string, pin: string) {
     programme: app.programme,
     programmeLevel: level,
     status: app.status,
+    rejectionReason: app.status === "rejected" ? app.rejection_reason : null,
+    letterReady: app.status === "accepted",
     feeDue,
     paid,
     payments: payments.map((p) => ({ id: p.id, method: p.method, amount: p.amount, status: p.status, reviewReason: p.review_reason, submittedAt: p.submitted_at })),
@@ -189,4 +191,24 @@ export async function reviewPayment(adminName: string, paymentId: string, decisi
   if (updateError) throw new Error(`reviewPayment (update) failed: ${updateError.message}`);
   await recordAudit({ actor: adminName, action: decision === "verify" ? "application_payment.verify" : "application_payment.reject", entityType: "application_payment", entityId: paymentId, detail: {} });
   return { success: true, status: decision === "verify" ? "verified" : "rejected" };
+}
+
+/** Admin: accept an application. Needs a verified fee, and the application must be awaiting a decision.
+ *  Enrolling the applicant as a student is a separate step (the existing approve). */
+export async function acceptApplication(adminName: string, applicationId: string) {
+  const supabase = getSupabase();
+  const { data, error } = await supabase.from("applications").select("id, status").eq("id", applicationId).maybeSingle();
+  if (error) throw new Error(`acceptApplication failed: ${error.message}`);
+  const row = data as unknown as { id: string; status: string } | null;
+  if (!row) throw new Error("That application was not found.");
+  if (!["submitted", "under_review", "info_required"].includes(row.status)) {
+    throw new Error("Only an application awaiting a decision can be accepted.");
+  }
+  const { data: paid } = await supabase.from("application_payments").select("id")
+    .eq("application_id", applicationId).eq("status", "verified").limit(1);
+  if (!paid || paid.length === 0) throw new Error("Verify the application fee before accepting this application.");
+  const { error: updateError } = await supabase.from("applications").update({ status: "accepted" }).eq("id", applicationId);
+  if (updateError) throw new Error(`acceptApplication (update) failed: ${updateError.message}`);
+  await recordAudit({ actor: adminName, action: "application.accept", entityType: "application", entityId: applicationId, detail: {} });
+  return { success: true, status: "accepted" };
 }

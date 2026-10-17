@@ -179,7 +179,7 @@ export interface Database {
       };
       applications: {
         Row: {
-          id: string; programme_level: string | null; application_number: string | null; pin_id: string; status: string;
+          id: string; declaration_date: string | null; declaration_name: string | null; guardian: unknown; enrollment_category: string | null; programme_level: string | null; application_number: string | null; pin_id: string; status: string;
           full_name: string; other_name: string; gender: string; date_of_birth: string; nationality: string;
           phone: string; whatsapp: string; email: string; address: string; district: string; city_town: string;
           academic_year: string; intake: string; programme: string; study_mode: string;

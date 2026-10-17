@@ -137,3 +137,11 @@ Fees by level: Certificate and Diploma, set by the admin (default 100 and 200). 
 Applicant portal (PIN and application number, sent in the body): POST /api/application-payments/portal/status and /portal/payment. Public fees: GET /api/application-payments/fees.
 Admin: GET/POST /api/application-payments/admin/fees, GET /admin/payments/pending, GET /admin/payments/:id/receipt, POST /admin/payments/:id/review {decision: verify|reject, reason}.
 The application form now requires programmeLevel and returns the application number and PIN.
+
+## Applicant decisions and acceptance letter (phase 2)
+Admin accepts an application once its fee is verified: POST /api/application-payments/admin/applications/:id/accept. Rejection uses the existing POST /api/admin/applications/:id/reject {reason}. Enrolling the applicant as a student is the existing approve, which stays separate.
+Applicant portal: POST /api/application-payments/portal/letter {applicationNumber, pin} returns the acceptance letter as a PDF. The status response now includes rejectionReason and letterReady.
+
+## Online application form (migration 028)
+The web form is at /apply. It follows the paper form: applicant, education (up to five schools), enrollment category, fee, guardian, and declaration. After submitting, the applicant is shown the application number and PIN, and pays and checks status from the same page.
+Run migration 028 after 027.
