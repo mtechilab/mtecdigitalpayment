@@ -5,7 +5,7 @@ import { rateLimit } from "../middleware/rateLimit.js";
 import { canTeach } from "../services/staffValidation.js";
 import { callMode } from "../services/messagingPolicy.js";
 import { deleteScope, validateReaction } from "../services/chatPolicy.js";
-import { Viewer, studentViewer, listConversations, listMessages, sendMessage, markRead, createProgrammeGroup, createClassGroup, startDirectChat, listTeachableClasses, listStudentDirectory, startStudentChat, createCallLink, deleteMessage, reactToMessage, removeReaction, setTyping, listTyping, createCustomGroup, listGroupMembers, addGroupMember, removeGroupMember } from "../services/messagingService.js";
+import { Viewer, studentViewer, listConversations, listMessages, sendMessage, markRead, createProgrammeGroup, createClassGroup, startDirectChat, listTeachableClasses, listStudentDirectory, startStudentChat, createCallLink, deleteMessage, reactToMessage, removeReaction, setTyping, listTyping, createCustomGroup, listGroupMembers, addGroupMember, removeGroupMember, listMemberDirectory } from "../services/messagingService.js";
 
 function fail(res: Response, err: unknown, fallback: string) {
   const message = (err as Error).message || fallback;
@@ -190,6 +190,13 @@ function registerGroupRoutes(router: Router, viewerOf: ViewerOf) {
       const { name, members } = (req.body || {}) as { name?: string; members?: unknown };
       res.json(await createCustomGroup(await viewerOf(req), name || "", members));
     } catch (err) { fail(res, err, "Could not create the group."); }
+  });
+
+  router.get("/directory", async (req: Request, res: Response) => {
+    try {
+      const q = typeof req.query.q === "string" ? req.query.q : "";
+      res.json({ people: await listMemberDirectory(await viewerOf(req), q) });
+    } catch (err) { fail(res, err, "Could not search people."); }
   });
 
   router.get("/conversations/:id/members", async (req: Request, res: Response) => {

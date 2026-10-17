@@ -559,6 +559,7 @@ export async function listGroupMembers(viewer: Viewer, conversationId: string) {
   if (error) throw new Error(`listGroupMembers failed: ${error.message}`);
   const rows = (data || []) as unknown as { member_kind: string; member_id: string; member_name: string }[];
   return {
+    viewer: { kind: viewer.kind, id: viewer.id },
     creator: { kind: group.created_by_kind, id: group.created_by_id || group.created_by_student_id },
     members: rows.map((m) => ({
       kind: m.member_kind, id: m.member_id, name: m.member_name, isCreator: isCreator(group, { kind: m.member_kind, id: m.member_id }),
@@ -601,4 +602,28 @@ export async function removeGroupMember(viewer: Viewer, conversationId: string, 
     .eq("conversation_id", conversationId).eq("member_kind", ref.kind).eq("member_id", ref.id);
   if (error) throw new Error(`removeGroupMember failed: ${error.message}`);
   return { success: true };
+}
+
+/** Students and staff the viewer can add to a group: active people, excluding the viewer. */
+export async function listMemberDirectory(viewer: Viewer, query: string) {
+  const term = query.trim().slice(0, 60).replace(/[%_\\]/g, (c) => `\\${c}`);
+  const supabase = getSupabase();
+  let students = supabase.from("students").select("id, full_name, programme")
+    .eq("status", "active").order("full_name", { ascending: true }).limit(20);
+  let staff = supabase.from("staff_accounts").select("id, full_name, role")
+    .eq("active", true).order("full_name", { ascending: true }).limit(20);
+  if (term) {
+    students = students.ilike("full_name", `%${term}%`);
+    staff = staff.ilike("full_name", `%${term}%`);
+  }
+  const [s1, s2] = await Promise.all([students, staff]);
+  if (s1.error) throw new Error(`listMemberDirectory failed: ${s1.error.message}`);
+  if (s2.error) throw new Error(`listMemberDirectory failed: ${s2.error.message}`);
+  const studentRows = ((s1.data || []) as unknown as { id: string; full_name: string; programme: string }[])
+    .filter((r) => !(viewer.kind === "student" && r.id === viewer.id))
+    .map((r) => ({ kind: "student", id: r.id, name: r.full_name, detail: r.programme }));
+  const staffRows = ((s2.data || []) as unknown as { id: string; full_name: string; role: string }[])
+    .filter((r) => !(viewer.kind === "staff" && r.id === viewer.id))
+    .map((r) => ({ kind: "staff", id: r.id, name: r.full_name, detail: r.role }));
+  return [...studentRows, ...staffRows];
 }
