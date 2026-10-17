@@ -140,7 +140,7 @@ export async function sendSignal(viewer: Viewer, callId: string, kind: unknown, 
     : { kind: call.caller_kind, id: call.caller_id };
   const { error } = await getSupabase().from("call_signals").insert({
     call_id: callId, from_kind: viewer.kind, from_id: viewer.id, to_kind: to.kind, to_id: to.id,
-    kind, payload: payload as Record<string, unknown>,
+    kind: kind as string, payload: payload as Record<string, unknown>,
   });
   if (error) throw new Error(`sendSignal failed: ${error.message}`);
   return { success: true };
