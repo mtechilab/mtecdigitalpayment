@@ -131,3 +131,8 @@ Staging checks:
 Students and staff create groups and add active students or staff members (up to 50 people, including the creator). Only the creator adds or removes people. Other members can leave.
 Endpoints (students: /api/messages/student, staff: /api/messages/staff): POST /groups/custom {name, members:[{kind,id}]}, GET /conversations/:id/members, POST /conversations/:id/members {kind,id}, POST /conversations/:id/members/remove {kind,id}.
 Run migration 024 after 023.
+
+## Admin library management (migration 025)
+Admins add, update, archive, restore, and delete library material.
+Endpoints: POST /api/library/admin (add, published at once), POST /api/library/admin/:id/update, POST /api/library/admin/:id/archive {archived: true|false}, DELETE /api/library/admin/:id (permanent, removes the stored files).
+Archived items are hidden from students and kept for the record. Run migration 025 after 024.

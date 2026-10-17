@@ -805,3 +805,7 @@ alter table conversations add column if not exists created_by_student_id uuid re
 -- Any registered member can create a group, and any active student or staff member can be added.
 alter table conversations add column if not exists created_by_kind text check (created_by_kind in ('student', 'staff'));
 alter table conversations add column if not exists created_by_id uuid;
+
+-- Admin library management (migration 025)
+-- Admin management of library material: archiving hides an item from students but keeps it.
+alter table library_items add column if not exists archived_at timestamptz;

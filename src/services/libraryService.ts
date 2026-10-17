@@ -4,7 +4,7 @@ import { validateLibraryUpload, validateLibraryFile, LibraryUploadInput } from "
 
 const BUCKET = "library";
 const SIGNED_URL_SECONDS = 300;
-const LIST_COLUMNS = "id, title, description, programme, course_code, semester, academic_year, topic, material_type, status, current_version, published_version, published_at, uploaded_by_name, created_at";
+const LIST_COLUMNS = "id, title, description, programme, course_code, semester, academic_year, topic, material_type, status, current_version, published_version, published_at, uploaded_by_name, created_at, archived_at";
 
 export interface LibraryFilters {
   programme?: string;
@@ -129,7 +129,7 @@ function applyFilters<Q extends { eq: (c: string, v: string) => Q; ilike: (c: st
 export async function listLibrary(viewer: { role: "student" | "lecturer" | "admin"; staffId?: string }, filters: LibraryFilters) {
   const supabase = getSupabase();
   const published = () => applyFilters(
-    supabase.from("library_items").select(LIST_COLUMNS).not("published_version", "is", null).order("published_at", { ascending: false }).limit(200),
+    supabase.from("library_items").select(LIST_COLUMNS).not("published_version", "is", null).is("archived_at", null).order("published_at", { ascending: false }).limit(200),
     filters);
 
   if (viewer.role === "student") {
@@ -161,10 +161,11 @@ export async function listLibrary(viewer: { role: "student" | "lecturer" | "admi
 export async function getLibraryDownload(viewer: { role: "student" | "lecturer" | "admin"; staffId?: string }, itemId: string, requestedVersion?: number) {
   const supabase = getSupabase();
   const { data: item, error } = await supabase.from("library_items")
-    .select("id, status, published_version, current_version, uploaded_by_staff_id").eq("id", itemId).maybeSingle();
+    .select("id, status, published_version, current_version, uploaded_by_staff_id, archived_at").eq("id", itemId).maybeSingle();
   if (error) throw new Error(`getLibraryDownload failed: ${error.message}`);
   if (!item) throw new Error("That item was not found.");
 
+  if (item.archived_at && viewer.role !== "admin") throw new Error("That item is not available.");
   const isOwner = item.uploaded_by_staff_id === viewer.staffId && !!viewer.staffId;
   let version: number | null;
   if (viewer.role === "student") {
@@ -185,4 +186,90 @@ export async function getLibraryDownload(viewer: { role: "student" | "lecturer" 
     .createSignedUrl(fileRow.storage_path as string, SIGNED_URL_SECONDS);
   if (signError || !signed) throw new Error(`Could not create the download link: ${signError?.message || "unknown"}`);
   return { url: signed.signedUrl, expiresInSeconds: SIGNED_URL_SECONDS, fileName: fileRow.file_name, contentType: fileRow.content_type, version: fileRow.version };
+}
+
+/** An administrator adds material directly. It is published at once, with no approval step. */
+export async function createLibraryItemByAdmin(adminName: string, input: LibraryUploadInput & {
+  description?: string; courseCode?: string; semester?: string; topic?: string;
+}) {
+  const check = validateLibraryUpload(input);
+  if (!check.ok) throw new Error(check.error);
+  const supabase = getSupabase();
+  const now = new Date().toISOString();
+  const { data: item, error } = await supabase.from("library_items").insert({
+    title: input.title.trim(),
+    description: (input.description || "").trim(),
+    programme: input.programme.trim(),
+    course_code: (input.courseCode || "").trim(),
+    semester: (input.semester || "").trim(),
+    academic_year: input.academicYear.trim(),
+    topic: (input.topic || "").trim(),
+    material_type: check.materialType,
+    status: "published",
+    uploaded_by_staff_id: null,
+    uploaded_by_name: adminName,
+    current_version: 1,
+    published_version: 1,
+    published_at: now,
+    approved_by: adminName,
+  }).select("id").single();
+  if (error) throw new Error(`createLibraryItemByAdmin failed: ${error.message}`);
+  await storeVersion(item.id as string, 1, { ext: check.ext, fileName: check.fileName, contentType: input.contentType, sizeBytes: check.sizeBytes, fileBase64: input.fileBase64 }, adminName);
+  await recordAudit({ actor: adminName, action: "library.admin_create", entityType: "library_item", entityId: item.id as string, detail: { version: 1 } });
+  return { id: item.id as string, status: "published" };
+}
+
+/** Changes the details of an item. Only the fields given are changed. The file itself is not replaced here. */
+export async function updateLibraryItemDetails(adminName: string, itemId: string, fields: {
+  title?: string; description?: string; programme?: string; courseCode?: string; semester?: string; academicYear?: string; topic?: string;
+}) {
+  const update: Record<string, string> = {};
+  if (fields.title !== undefined) {
+    const t = fields.title.trim();
+    if (t.length < 3 || t.length > 160) throw new Error("The title must be 3 to 160 characters.");
+    update.title = t;
+  }
+  if (fields.programme !== undefined) {
+    if (!fields.programme.trim()) throw new Error("Choose the programme.");
+    update.programme = fields.programme.trim();
+  }
+  if (fields.academicYear !== undefined) {
+    if (!/^\d{4}(\/\d{4})?$/.test(fields.academicYear.trim())) throw new Error("Academic year must look like 2026 or 2026/2027.");
+    update.academic_year = fields.academicYear.trim();
+  }
+  if (fields.description !== undefined) update.description = fields.description.trim();
+  if (fields.courseCode !== undefined) update.course_code = fields.courseCode.trim();
+  if (fields.semester !== undefined) update.semester = fields.semester.trim();
+  if (fields.topic !== undefined) update.topic = fields.topic.trim();
+  if (Object.keys(update).length === 0) throw new Error("Nothing to change.");
+  const { error } = await getSupabase().from("library_items").update(update).eq("id", itemId);
+  if (error) throw new Error(`updateLibraryItemDetails failed: ${error.message}`);
+  await recordAudit({ actor: adminName, action: "library.update", entityType: "library_item", entityId: itemId, detail: { fields: Object.keys(update) } });
+  return { success: true };
+}
+
+/** Archiving hides the item from students; restoring shows it again. Nothing is lost. */
+export async function setLibraryItemArchived(adminName: string, itemId: string, archived: boolean) {
+  const { error } = await getSupabase().from("library_items")
+    .update({ archived_at: archived ? new Date().toISOString() : null }).eq("id", itemId);
+  if (error) throw new Error(`setLibraryItemArchived failed: ${error.message}`);
+  await recordAudit({ actor: adminName, action: archived ? "library.archive" : "library.restore", entityType: "library_item", entityId: itemId, detail: {} });
+  return { success: true };
+}
+
+/** Permanent. Removes every stored version of the file, then the item and its version records. */
+export async function deleteLibraryItem(adminName: string, itemId: string) {
+  const supabase = getSupabase();
+  const { data: versions, error: readError } = await supabase.from("library_versions")
+    .select("storage_path").eq("item_id", itemId);
+  if (readError) throw new Error(`deleteLibraryItem failed: ${readError.message}`);
+  const paths = ((versions || []) as unknown as { storage_path: string }[]).map((v) => v.storage_path);
+  if (paths.length > 0) {
+    const { error: removeError } = await supabase.storage.from(BUCKET).remove(paths);
+    if (removeError) throw new Error(`deleteLibraryItem (files) failed: ${removeError.message}`);
+  }
+  const { error } = await supabase.from("library_items").delete().eq("id", itemId);
+  if (error) throw new Error(`deleteLibraryItem failed: ${error.message}`);
+  await recordAudit({ actor: adminName, action: "library.delete", entityType: "library_item", entityId: itemId, detail: { files: paths.length } });
+  return { success: true };
 }

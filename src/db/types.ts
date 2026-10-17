@@ -238,7 +238,7 @@ export interface Database {
         Relationships: [];
       };
       library_items: {
-        Row: { id: string; title: string; description: string; programme: string; course_code: string; semester: string; academic_year: string; topic: string; material_type: string; status: string; uploaded_by_staff_id: string | null; uploaded_by_name: string; current_version: number; published_version: number | null; published_at: string | null; approved_by: string | null; rejection_reason: string | null; created_at: string };
+        Row: { id: string; title: string; description: string; programme: string; course_code: string; semester: string; academic_year: string; topic: string; material_type: string; status: string; uploaded_by_staff_id: string | null; uploaded_by_name: string; current_version: number; published_version: number | null; published_at: string | null; approved_by: string | null; rejection_reason: string | null; archived_at: string | null; created_at: string };
         Insert: Partial<Database["public"]["Tables"]["library_items"]["Row"]>;
         Update: Partial<Database["public"]["Tables"]["library_items"]["Row"]>;
         Relationships: [];
