@@ -116,3 +116,18 @@ Staging checks:
 2. A second call in the same chat is refused while the first is ringing.
 3. An unanswered call stops appearing after 60 seconds.
 4. Signals reach only the other person; a third person gets not found.
+
+## Student groups (migration 023)
+Students create groups and add other students (up to 50 people, including the creator). Only the creator adds or removes people. Other members can leave.
+Endpoints: POST /api/messages/student/groups/custom, GET/POST /api/messages/student/conversations/:id/members, DELETE /api/messages/student/conversations/:id/members/:studentRowId.
+Staging checks:
+1. A student creates a group with two others; all three see it.
+2. A member who is not the creator cannot add someone (refused).
+3. The creator adds a student; that student sees the group and its messages.
+4. A non-member cannot read the group's messages.
+5. The creator cannot leave; a member can leave and loses access.
+
+## Groups with any registered member (migration 024)
+Students and staff create groups and add active students or staff members (up to 50 people, including the creator). Only the creator adds or removes people. Other members can leave.
+Endpoints (students: /api/messages/student, staff: /api/messages/staff): POST /groups/custom {name, members:[{kind,id}]}, GET /conversations/:id/members, POST /conversations/:id/members {kind,id}, POST /conversations/:id/members/remove {kind,id}.
+Run migration 024 after 023.

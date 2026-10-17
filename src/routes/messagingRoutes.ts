@@ -5,7 +5,7 @@ import { rateLimit } from "../middleware/rateLimit.js";
 import { canTeach } from "../services/staffValidation.js";
 import { callMode } from "../services/messagingPolicy.js";
 import { deleteScope, validateReaction } from "../services/chatPolicy.js";
-import { Viewer, studentViewer, listConversations, listMessages, sendMessage, markRead, createProgrammeGroup, createClassGroup, startDirectChat, listTeachableClasses, listStudentDirectory, startStudentChat, createCallLink, deleteMessage, reactToMessage, removeReaction, setTyping, listTyping } from "../services/messagingService.js";
+import { Viewer, studentViewer, listConversations, listMessages, sendMessage, markRead, createProgrammeGroup, createClassGroup, startDirectChat, listTeachableClasses, listStudentDirectory, startStudentChat, createCallLink, deleteMessage, reactToMessage, removeReaction, setTyping, listTyping, createCustomGroup, listGroupMembers, addGroupMember, removeGroupMember } from "../services/messagingService.js";
 
 function fail(res: Response, err: unknown, fallback: string) {
   const message = (err as Error).message || fallback;
@@ -182,3 +182,37 @@ staffMessagingRouter.post("/direct", async (req: Request, res: Response) => {
 
 registerEssentials(studentMessagingRouter, async (req) => viewerOf(req as AuthenticatedRequest));
 registerEssentials(staffMessagingRouter, async (req) => staffViewer(req));
+
+/** Group routes for students and staff alike: create, list members, add, and remove or leave. */
+function registerGroupRoutes(router: Router, viewerOf: ViewerOf) {
+  router.post("/groups/custom", async (req: Request, res: Response) => {
+    try {
+      const { name, members } = (req.body || {}) as { name?: string; members?: unknown };
+      res.json(await createCustomGroup(await viewerOf(req), name || "", members));
+    } catch (err) { fail(res, err, "Could not create the group."); }
+  });
+
+  router.get("/conversations/:id/members", async (req: Request, res: Response) => {
+    try { res.json(await listGroupMembers(await viewerOf(req), req.params.id)); }
+    catch (err) { fail(res, err, "Could not load the members."); }
+  });
+
+  router.post("/conversations/:id/members", async (req: Request, res: Response) => {
+    try {
+      const { kind, id } = (req.body || {}) as { kind?: string; id?: string };
+      if ((kind !== "student" && kind !== "staff") || !id) return res.status(400).json({ error: "Choose a student or staff member." });
+      res.json(await addGroupMember(await viewerOf(req), req.params.id, { kind, id }));
+    } catch (err) { fail(res, err, "Could not add the person."); }
+  });
+
+  router.post("/conversations/:id/members/remove", async (req: Request, res: Response) => {
+    try {
+      const { kind, id } = (req.body || {}) as { kind?: string; id?: string };
+      if ((kind !== "student" && kind !== "staff") || !id) return res.status(400).json({ error: "Choose a student or staff member." });
+      res.json(await removeGroupMember(await viewerOf(req), req.params.id, { kind, id }));
+    } catch (err) { fail(res, err, "Could not remove the person."); }
+  });
+}
+
+registerGroupRoutes(studentMessagingRouter, async (req) => viewerOf(req as AuthenticatedRequest));
+registerGroupRoutes(staffMessagingRouter, async (req) => staffViewer(req));

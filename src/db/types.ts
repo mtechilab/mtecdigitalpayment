@@ -292,7 +292,7 @@ export interface Database {
         Relationships: [];
       };
       conversations: {
-        Row: { id: string; kind: string; title: string; programme: string | null; class_id: string | null; created_by_staff_id: string | null; created_by_name: string; last_message_at: string | null; created_at: string };
+        Row: { id: string; kind: string; title: string; programme: string | null; class_id: string | null; created_by_staff_id: string | null; created_by_name: string; created_by_student_id: string | null; created_by_kind: string | null; created_by_id: string | null; last_message_at: string | null; created_at: string };
         Insert: Partial<Database["public"]["Tables"]["conversations"]["Row"]>;
         Update: Partial<Database["public"]["Tables"]["conversations"]["Row"]>;
         Relationships: [];

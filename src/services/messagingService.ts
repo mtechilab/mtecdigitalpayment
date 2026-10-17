@@ -4,6 +4,7 @@ import { getSupabase } from "../db/supabaseClient.js";
 import { recordAudit } from "./auditLogService.js";
 import { validateText, validateVoice, unreadCount, callLinkUrl, CallMode } from "./messagingPolicy.js";
 import { isReadBy, previewOf, isTypingNow, ReactionKey } from "./chatPolicy.js";
+import { validateGroupName, validateMemberList, groupHasRoom, MemberRef } from "./groupPolicy.js";
 import { canTeach, isAdministratorRole } from "./staffValidation.js";
 
 export type Viewer =
@@ -35,7 +36,7 @@ export async function studentViewer(studentRowId: string): Promise<Viewer> {
  *  so a student who joins a programme or class gets the group without any membership step. */
 async function canAccess(conv: ConversationRow, viewer: Viewer): Promise<boolean> {
   const supabase = getSupabase();
-  if (conv.kind === "direct") {
+  if (conv.kind === "direct" || conv.kind === "custom") {
     const { data } = await supabase.from("conversation_members").select("member_id")
       .eq("conversation_id", conv.id).eq("member_kind", viewer.kind).eq("member_id", viewer.id).maybeSingle();
     return !!data;
@@ -378,7 +379,7 @@ export async function startStudentChat(viewer: Viewer, otherStudentId: string) {
   const supabase = getSupabase();
   const { data: mine } = await supabase.from("conversation_members").select("conversation_id")
     .eq("member_kind", "student").eq("member_id", viewer.id);
-  const ids = (mine || []).map((m) => m.conversation_id as string);
+  const ids = ((mine || []) as { conversation_id: string }[]).map((m) => m.conversation_id);
   if (ids.length > 0) {
     const { data: shared } = await supabase.from("conversation_members").select("conversation_id")
       .eq("member_kind", "student").eq("member_id", other.id).in("conversation_id", ids).limit(1);
@@ -484,4 +485,120 @@ export async function listTyping(viewer: Viewer, conversationId: string) {
       .filter((r) => isTypingNow(r.updated_at) && !(r.member_kind === viewer.kind && r.member_id === viewer.id))
       .map((r) => r.member_name),
   };
+}
+
+interface GroupRow { id: string; kind: string; created_by_kind: string | null; created_by_id: string | null; created_by_student_id: string | null }
+
+async function loadGroup(conversationId: string): Promise<GroupRow> {
+  const { data, error } = await getSupabase().from("conversations")
+    .select("id, kind, created_by_kind, created_by_id, created_by_student_id").eq("id", conversationId).maybeSingle();
+  if (error) throw new Error(`loadGroup failed: ${error.message}`);
+  if (!data || (data as { kind: string }).kind !== "custom") throw new Error("That group was not found.");
+  return data as unknown as GroupRow;
+}
+
+/** Whether this person created the group. Groups made before migration 024 are matched by student id. */
+function isCreator(group: GroupRow, who: { kind: string; id: string }): boolean {
+  if (group.created_by_kind && group.created_by_id) return group.created_by_kind === who.kind && group.created_by_id === who.id;
+  return who.kind === "student" && group.created_by_student_id === who.id;
+}
+
+/** The name of an active student or staff member. Anyone else cannot be added. */
+async function memberName(ref: MemberRef): Promise<string> {
+  const supabase = getSupabase();
+  if (ref.kind === "student") {
+    const { data, error } = await supabase.from("students").select("id, full_name, status").eq("id", ref.id).maybeSingle();
+    if (error) throw new Error(`memberName failed: ${error.message}`);
+    const row = data as unknown as { full_name: string; status: string } | null;
+    if (!row || row.status !== "active") throw new Error("Some of the people could not be found.");
+    return row.full_name;
+  }
+  const { data, error } = await supabase.from("staff_accounts").select("id, full_name, active").eq("id", ref.id).maybeSingle();
+  if (error) throw new Error(`memberName failed: ${error.message}`);
+  const row = data as unknown as { full_name: string; active: boolean } | null;
+  if (!row || !row.active) throw new Error("Some of the people could not be found.");
+  return row.full_name;
+}
+
+/** Any registered member creates a group and adds up to 49 others, students or staff. */
+export async function createCustomGroup(viewer: Viewer, name: string, members: unknown) {
+  const creator: MemberRef = { kind: viewer.kind, id: viewer.id };
+  const nameProblem = validateGroupName(name);
+  if (nameProblem) throw new Error(nameProblem);
+  const listProblem = validateMemberList(members, creator);
+  if (listProblem) throw new Error(listProblem);
+  const refs = members as MemberRef[];
+
+  const people: { ref: MemberRef; name: string }[] = [];
+  for (const ref of refs) people.push({ ref, name: await memberName(ref) });
+
+  const supabase = getSupabase();
+  const { data, error } = await supabase.from("conversations").insert({
+    kind: "custom", title: name.trim(), created_by_kind: viewer.kind, created_by_id: viewer.id,
+    created_by_student_id: viewer.kind === "student" ? viewer.id : null,
+    created_by_name: viewer.name,
+  }).select("id").single();
+  if (error) throw new Error(`createCustomGroup failed: ${error.message}`);
+  const conversationId = (data as { id: string }).id;
+
+  const rows = [
+    { conversation_id: conversationId, member_kind: viewer.kind, member_id: viewer.id, member_name: viewer.name },
+    ...people.map((p) => ({ conversation_id: conversationId, member_kind: p.ref.kind, member_id: p.ref.id, member_name: p.name })),
+  ];
+  const { error: memberError } = await supabase.from("conversation_members").insert(rows);
+  if (memberError) throw new Error(`createCustomGroup (members) failed: ${memberError.message}`);
+  return { id: conversationId, created: true };
+}
+
+/** The members of a group, students and staff, with the creator marked. Only members can see the list. */
+export async function listGroupMembers(viewer: Viewer, conversationId: string) {
+  await requireAccess(conversationId, viewer);
+  const group = await loadGroup(conversationId);
+  const { data, error } = await getSupabase().from("conversation_members")
+    .select("member_kind, member_id, member_name").eq("conversation_id", conversationId);
+  if (error) throw new Error(`listGroupMembers failed: ${error.message}`);
+  const rows = (data || []) as unknown as { member_kind: string; member_id: string; member_name: string }[];
+  return {
+    creator: { kind: group.created_by_kind, id: group.created_by_id || group.created_by_student_id },
+    members: rows.map((m) => ({
+      kind: m.member_kind, id: m.member_id, name: m.member_name, isCreator: isCreator(group, { kind: m.member_kind, id: m.member_id }),
+    })),
+  };
+}
+
+/** Only the creator adds people, and only up to the group limit. */
+export async function addGroupMember(viewer: Viewer, conversationId: string, ref: MemberRef) {
+  const group = await loadGroup(conversationId);
+  if (!isCreator(group, viewer)) throw new Error("Only the group creator can add people.");
+  const listProblem = validateMemberList([ref], { kind: viewer.kind, id: viewer.id });
+  if (listProblem) throw new Error(listProblem);
+  const { data: existing, error: countError } = await getSupabase().from("conversation_members").select("member_id")
+    .eq("conversation_id", conversationId);
+  if (countError) throw new Error(`addGroupMember failed: ${countError.message}`);
+  const current = (existing || []) as unknown as { member_id: string }[];
+  if (!groupHasRoom(current.length)) throw new Error("This group is full.");
+  const { data: already } = await getSupabase().from("conversation_members").select("member_id")
+    .eq("conversation_id", conversationId).eq("member_kind", ref.kind).eq("member_id", ref.id).maybeSingle();
+  if (already) throw new Error("That person is already in the group.");
+  const name = await memberName(ref);
+  const { error } = await getSupabase().from("conversation_members").insert({
+    conversation_id: conversationId, member_kind: ref.kind, member_id: ref.id, member_name: name,
+  });
+  if (error) throw new Error(`addGroupMember failed: ${error.message}`);
+  return { success: true };
+}
+
+/** The creator removes someone; anyone else can leave. The creator cannot leave yet. */
+export async function removeGroupMember(viewer: Viewer, conversationId: string, ref: MemberRef) {
+  const group = await loadGroup(conversationId);
+  await requireAccess(conversationId, viewer);
+  const creator = isCreator(group, viewer);
+  const leaving = ref.kind === viewer.kind && ref.id === viewer.id;
+  if (leaving && creator) throw new Error("The creator cannot leave the group yet.");
+  if (!leaving && !creator) throw new Error("Only the group creator can remove people.");
+  if (!leaving && isCreator(group, ref)) throw new Error("The creator cannot be removed.");
+  const { error } = await getSupabase().from("conversation_members").delete()
+    .eq("conversation_id", conversationId).eq("member_kind", ref.kind).eq("member_id", ref.id);
+  if (error) throw new Error(`removeGroupMember failed: ${error.message}`);
+  return { success: true };
 }

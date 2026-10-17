@@ -793,3 +793,15 @@ create index if not exists idx_call_signals_call on call_signals (call_id, id);
 
 alter table calls enable row level security;
 alter table call_signals enable row level security;
+
+-- Student groups (migration 023)
+-- Students can create their own groups and add other students. Membership is stored in
+-- conversation_members, the same table direct chats use.
+alter table conversations drop constraint if exists conversations_kind_check;
+alter table conversations add constraint conversations_kind_check check (kind in ('direct', 'programme', 'class', 'custom'));
+alter table conversations add column if not exists created_by_student_id uuid references students(id);
+
+-- Group creators: students and staff (migration 024)
+-- Any registered member can create a group, and any active student or staff member can be added.
+alter table conversations add column if not exists created_by_kind text check (created_by_kind in ('student', 'staff'));
+alter table conversations add column if not exists created_by_id uuid;
