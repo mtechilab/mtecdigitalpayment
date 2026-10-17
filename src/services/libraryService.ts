@@ -223,7 +223,10 @@ export async function createLibraryItemByAdmin(adminName: string, input: Library
 export async function updateLibraryItemDetails(adminName: string, itemId: string, fields: {
   title?: string; description?: string; programme?: string; courseCode?: string; semester?: string; academicYear?: string; topic?: string;
 }) {
-  const update: Record<string, string> = {};
+  const update: {
+    title?: string; description?: string; programme?: string; course_code?: string;
+    semester?: string; academic_year?: string; topic?: string;
+  } = {};
   if (fields.title !== undefined) {
     const t = fields.title.trim();
     if (t.length < 3 || t.length > 160) throw new Error("The title must be 3 to 160 characters.");
