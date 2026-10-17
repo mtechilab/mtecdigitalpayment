@@ -22,16 +22,18 @@ router.post("/submit", rateLimit("application-submit", 20, 60*60*1000), async (r
       return res.status(400).json({ error: "Choose Certificate or Diploma." });
     }
     const application = await submitApplication({ fullName, phone, email, programme, academicYear, intake, studyMode });
+    const applicationNumber = application.application_number;
+    if (!applicationNumber) throw new Error("The application number was not created.");
     const supabase = getSupabase();
-    await supabase.from("applications").update({ programme_level: programmeLevel }).eq("application_number", application.application_number);
-    const { data: row } = await supabase.from("applications").select("pin_id").eq("application_number", application.application_number).maybeSingle();
+    await supabase.from("applications").update({ programme_level: programmeLevel }).eq("application_number", applicationNumber);
+    const { data: row } = await supabase.from("applications").select("pin_id").eq("application_number", applicationNumber).maybeSingle();
     const pinId = (row as unknown as { pin_id: string } | null)?.pin_id;
     const { data: pinRow } = pinId
       ? await supabase.from("application_pins").select("pin").eq("id", pinId).maybeSingle()
       : { data: null };
     res.json({
       success: true,
-      applicationNumber: application.application_number,
+      applicationNumber,
       pin: (pinRow as unknown as { pin: string } | null)?.pin || null,
     });
   } catch (err) {
