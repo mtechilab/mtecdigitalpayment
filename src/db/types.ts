@@ -333,6 +333,18 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["conversation_typing"]["Row"]>;
         Relationships: [];
       };
+      calls: {
+        Row: { id: string; conversation_id: string; caller_kind: string; caller_id: string; caller_name: string; callee_kind: string; callee_id: string; mode: string; status: string; created_at: string; answered_at: string | null; ended_at: string | null; duration_seconds: number | null };
+        Insert: Partial<Database["public"]["Tables"]["calls"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["calls"]["Row"]>;
+        Relationships: [];
+      };
+      call_signals: {
+        Row: { id: number; call_id: string; from_kind: string; from_id: string; to_kind: string; to_id: string; kind: string; payload: unknown; created_at: string };
+        Insert: Partial<Database["public"]["Tables"]["call_signals"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["call_signals"]["Row"]>;
+        Relationships: [];
+      };
       chat_messages: {
         Row: { id: string; student_row_id: string; sender_type: string; sender_name: string; message: string; created_at: string; students?: { student_id: string; full_name: string } | null };
         Insert: Partial<Database["public"]["Tables"]["chat_messages"]["Row"]>;

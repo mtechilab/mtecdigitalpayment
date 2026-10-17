@@ -105,3 +105,14 @@ Staging checks:
 3. A student sends a text; the lecturer sees it in the conversation, with an unread count of 1 before reading.
 4. A voice note plays through its link, and the link expires after 5 minutes.
 5. A student tries to create a group, and is refused.
+
+## In-app calls (migration 022)
+Set ICE_SERVERS_JSON in Render only when a TURN relay is available, for example:
+[{"urls":"turn:relay.example:3478","username":"user","credential":"secret"}]
+Without it, the server uses the public STUN server. Calls can then fail on networks that block direct connections.
+Endpoints: /api/calls/student and /api/calls/staff: GET /ice, POST /start, GET /incoming, GET /:id, POST /:id/answer, POST /:id/reject, POST /:id/end, POST /:id/signal, GET /:id/signals.
+Staging checks:
+1. Two students in a direct chat: one starts a call, the other sees it in /incoming.
+2. A second call in the same chat is refused while the first is ringing.
+3. An unanswered call stops appearing after 60 seconds.
+4. Signals reach only the other person; a third person gets not found.
