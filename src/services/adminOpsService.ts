@@ -149,6 +149,14 @@ export async function approveApplication(applicationId: string, actor: string = 
     throw new Error(`This application is already ${application.status.replace("_", " ")} and can't be re-decided.`);
   }
 
+  // The student ID and PIN are generated only after the applicant is accepted and the fee is verified.
+  if (application.status !== "accepted") {
+    throw new Error("Accept the application first. The student PIN is generated after acceptance.");
+  }
+  const { data: verifiedFee } = await supabase.from("application_payments").select("id")
+    .eq("application_id", applicationId).eq("status", "verified").limit(1);
+  if (!verifiedFee || verifiedFee.length === 0) throw new Error("Verify the application fee before generating the student PIN.");
+
   const year = application.academic_year || String(new Date().getFullYear());
   const { count: studentCount } = await supabase.from("students").select("id", { count: "exact", head: true });
   const seq = String((studentCount || 0) + 1).padStart(5, "0");
@@ -169,7 +177,7 @@ export async function approveApplication(applicationId: string, actor: string = 
   if (studentError) throw new Error(`approveApplication (student insert) failed: ${studentError.message}`);
 
   const { error: updateError } = await supabase
-    .from("applications").update({ status: "approved" }).eq("id", applicationId);
+    .from("applications").update({ status: "approved", student_id: studentId }).eq("id", applicationId);
   if (updateError) throw new Error(`approveApplication (status update) failed: ${updateError.message}`);
 
   const paymentPlanCreated = await tryCreateDefaultPaymentPlan(student.id, application.programme);

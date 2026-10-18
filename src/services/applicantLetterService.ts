@@ -18,7 +18,7 @@ const METHOD_LABELS: Record<string, string> = { orange_money: "Orange Money", ca
  *  application number and PIN, and the letter is only available once the application is accepted. */
 export async function streamApplicantLetter(applicationNumber: string, pin: string, res: Response) {
   const app = await authenticate(applicationNumber, pin);
-  if (app.status !== "accepted") {
+  if (app.status !== "accepted" && app.status !== "approved") {
     throw new Error("Your letter is not ready. It is available once your application is accepted.");
   }
   const supabase = getSupabase();
@@ -72,6 +72,21 @@ export async function streamApplicantLetter(applicationNumber: string, pin: stri
     `${ORANGE_MONEY_NUMBER}.`,
     { align: "justify" },
   );
+  // After approval the letter carries the student ID and PIN the applicant uses to register.
+  const { data: link } = await supabase.from("applications").select("student_id").eq("id", app.id).maybeSingle();
+  const studentId = (link as unknown as { student_id: string | null } | null)?.student_id;
+  if (studentId) {
+    const { data: student } = await supabase.from("students").select("student_id, student_pin").eq("student_id", studentId).maybeSingle();
+    const login = student as unknown as { student_id: string; student_pin: string } | null;
+    if (login) {
+      doc.moveDown(1.5);
+      doc.fillColor(NAVY).font("Helvetica-Bold").fontSize(12).text("Your student login");
+      doc.fillColor("black").font("Helvetica").fontSize(11);
+      doc.text(`Student ID: ${login.student_id}`);
+      doc.text(`Registration PIN: ${login.student_pin}`);
+      doc.text("Sign in to the Student Portal with your Student ID and PIN. On first sign-in you will be asked to set a new password.", { align: "justify" });
+    }
+  }
   doc.moveDown(3);
   doc.text("Admissions Office");
   doc.text("Makeni Technical College of Innovative Technology");

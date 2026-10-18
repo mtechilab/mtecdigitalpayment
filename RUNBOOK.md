@@ -152,3 +152,6 @@ Students: POST /students/:id/update, POST /students/:id/status {status}, POST /s
 Programmes: GET /programmes, POST /programmes, POST /programmes/:id/update, POST /programmes/:id/active {active}. Names are not changed, since students and fees link by name.
 Fees: GET /fees, POST /fees {programme, registrationFee, tuitionPerSemester}. Applies to invoices created from now on.
 Not yet: payment plan templates, and hiding deactivated programmes from the public list.
+
+## Student PIN after acceptance (migration 030)
+Accept first (applicant accepted, fee verified), then Generate PIN (approve). The student ID and PIN are created once; the letter shows them; the applicant registers with them. Run migration 030 after 029.

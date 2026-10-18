@@ -55,6 +55,8 @@ export async function getFees() {
 /** The applicant's status, fee, and payments. Used by the app and the web portal alike. */
 export async function applicantStatus(applicationNumber: string, pin: string) {
   const app = await authenticate(applicationNumber, pin);
+  const { data: link } = await getSupabase().from("applications").select("student_id").eq("id", app.id).maybeSingle();
+  const studentId = (link as unknown as { student_id: string | null } | null)?.student_id || null;
   const payments = await paymentsFor(app.id);
   const paid = payments.some((p) => p.status === "verified");
   const pending = payments.some((p) => p.status === "pending");
@@ -67,7 +69,8 @@ export async function applicantStatus(applicationNumber: string, pin: string) {
     programmeLevel: level,
     status: app.status,
     rejectionReason: app.status === "rejected" ? app.rejection_reason : null,
-    letterReady: app.status === "accepted",
+    letterReady: app.status === "accepted" || app.status === "approved",
+    studentId,
     feeDue,
     paid,
     payments: payments.map((p) => ({ id: p.id, method: p.method, amount: p.amount, status: p.status, reviewReason: p.review_reason, submittedAt: p.submitted_at })),
