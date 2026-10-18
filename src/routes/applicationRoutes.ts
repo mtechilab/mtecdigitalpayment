@@ -36,7 +36,7 @@ router.post("/submit", rateLimit("application-submit", 20, 60*60*1000), async (r
     if (!applicationNumber) throw new Error("The application number was not created.");
 
     const supabase = getSupabase();
-    await supabase.from("applications").update({
+    const { error: detailsError } = await supabase.from("applications").update({
       programme_level: b.programmeLevel as string,
       enrollment_category: b.enrollmentCategory as string,
       gender: str(b.gender),
@@ -52,6 +52,10 @@ router.post("/submit", rateLimit("application-submit", 20, 60*60*1000), async (r
       declaration_date: str(b.declarationDate),
       declaration_confirmed: true,
     }).eq("application_number", applicationNumber);
+    if (detailsError) {
+      // The application was created, but its details were not saved. Usually migration 028 has not run.
+      console.error("[/applications/submit] details not saved for", applicationNumber, ":", detailsError.message);
+    }
 
     const { data: row } = await supabase.from("applications").select("pin_id").eq("application_number", applicationNumber).maybeSingle();
     const pinId = (row as unknown as { pin_id: string } | null)?.pin_id;

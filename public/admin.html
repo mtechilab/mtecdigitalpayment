@@ -167,6 +167,8 @@
       <div class="panel">
         <h3>Recent Applications <a href="#" onclick="return false;">View all →</a></h3>
         <div id="applicationsList"></div>
+        <h3>All applications</h3>
+        <div id="allApplications"></div>
       </div>
       <div class="panel">
         <h3>Recent Payments <a href="#" onclick="return false;">View all →</a></h3>
@@ -249,7 +251,94 @@
     }
   }
 
+  // The same applications list the admin app shows: number, name, programme, level, status, and fee.
+  function appEsc(v) { return String(v == null ? "" : v).replace(/[&<>"]/g, function (c) { return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]; }); }
+  function appPaymentLabel(p) {
+    if (p === "verified") return "verified";
+    if (p === "pending") return "awaiting check";
+    if (p === "rejected") return "rejected";
+    return "not paid";
+  }
+  async function loadAllApplications() {
+    var box = document.getElementById("allApplications");
+    if (!box || !token) return;
+    try {
+      const res = await fetch(API + "/api/admin/applications", { headers: { "Authorization": "Bearer " + token } });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not load applications.");
+      const rows = data.applications || [];
+      if (rows.length === 0) { box.innerHTML = '<div class="comingsoon">No applications yet.</div>'; return; }
+      box.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:13px">' +
+        '<tr><th align="left">Number</th><th align="left">Name</th><th align="left">Programme</th><th align="left">Level</th><th align="left">Status</th><th align="left">Fee</th><th align="left">Decision</th></tr>' +
+        rows.map(function (a) {
+          return '<tr><td>' + appEsc(a.application_number) + '</td><td>' + appEsc(a.full_name) + '</td><td>' + appEsc(a.programme) +
+            '</td><td>' + appEsc(a.programme_level || "") + '</td><td>' + appEsc(String(a.status || "").replace(/_/g, " ")) +
+            '</td><td>' + appEsc(appPaymentLabel(a.payment_status)) + '</td><td>' + appActions(a) + '</td></tr>';
+        }).join("") + '</table>';
+      if (!box.dataset.wired) { box.addEventListener("click", appClick); box.dataset.wired = "1"; }
+    } catch (e) {
+      box.innerHTML = '<div class="comingsoon">' + appEsc(e.message) + '</div>';
+    }
+  }
+
+  // The decisions shown for each application. Same rules as the admin app.
+  function appActions(a) {
+    var awaiting = ["submitted", "under_review", "info_required"].indexOf(a.status) >= 0;
+    var b = "";
+    var pending = a.payment_status === "pending" && a.payment_id;
+    if (pending) {
+      b += '<button data-act="verify" data-pid="' + appEsc(a.payment_id) + '">Verify fee</button> ';
+      b += '<button data-act="rejectFee" data-pid="' + appEsc(a.payment_id) + '">Reject fee</button> ';
+    }
+    if (a.payment_status === "verified" && awaiting) {
+      b += '<button data-act="accept" data-id="' + appEsc(a.id) + '">Accept</button> ';
+    }
+    if (awaiting) {
+      b += '<button data-act="rejectApp" data-id="' + appEsc(a.id) + '">Reject</button>';
+    }
+    return b || "&mdash;";
+  }
+
+  async function appCall(method, path, body) {
+    const res = await fetch(API + path, {
+      method: method,
+      headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const data = await res.json().catch(function () { return {}; });
+    if (!res.ok) throw new Error(data.error || "The action could not be completed.");
+    return data;
+  }
+
+  async function appClick(e) {
+    var b = e.target.closest("button[data-act]");
+    if (!b) return;
+    var act = b.dataset.act;
+    try {
+      if (act === "verify") {
+        if (!confirm("Verify this application fee?")) return;
+        await appCall("POST", "/api/application-payments/admin/payments/" + b.dataset.pid + "/review", { decision: "verify" });
+      } else if (act === "rejectFee") {
+        var reason = prompt("Reason for rejecting the fee (the applicant will see it):");
+        if (!reason) return;
+        await appCall("POST", "/api/application-payments/admin/payments/" + b.dataset.pid + "/review", { decision: "reject", reason: reason });
+      } else if (act === "accept") {
+        if (!confirm("Accept this application? The applicant can then download the acceptance letter.")) return;
+        await appCall("POST", "/api/application-payments/admin/applications/" + b.dataset.id + "/accept");
+      } else if (act === "rejectApp") {
+        var why = prompt("Reason for rejecting the application (the applicant will see it):");
+        if (!why) return;
+        await appCall("POST", "/api/admin/applications/" + b.dataset.id + "/reject", { reason: why });
+      }
+      loadAllApplications();
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
   function renderDashboard(d) {
+    loadAllApplications();
+    if (!window.__appsTimer) window.__appsTimer = setInterval(loadAllApplications, 30000);
     document.getElementById("statStudents").textContent = d.totalStudents;
     document.getElementById("statCourses").textContent = d.totalCourses;
     document.getElementById("statGrades").textContent = d.totalGrades;

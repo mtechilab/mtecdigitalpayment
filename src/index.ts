@@ -1,3 +1,4 @@
+import { adminManagementRouter } from "./routes/adminManagementRoutes.js";
 import { applicationPaymentRouter } from "./routes/applicationPaymentRoutes.js";
 import { studentCallRouter, staffCallRouter } from "./routes/callRoutes.js";
 import { studentProfilePhotoRouter } from "./routes/profilePhotoRoutes.js";
@@ -54,6 +55,7 @@ app.use("/api/profile-photo/student", studentProfilePhotoRouter);
 app.use("/api/calls/student", studentCallRouter);
 app.use("/api/calls/staff", staffCallRouter);
 app.use("/api/application-payments", applicationPaymentRouter);
+app.use("/api/admin/manage", adminManagementRouter);
 app.use("/payments", paymentRoutes);
 app.use("/api/staff", staffRoutes);
 app.use("/api/admin", adminRoutes);

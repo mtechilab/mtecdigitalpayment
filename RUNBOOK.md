@@ -145,3 +145,10 @@ Applicant portal: POST /api/application-payments/portal/letter {applicationNumbe
 ## Online application form (migration 028)
 The web form is at /apply. It follows the paper form: applicant, education (up to five schools), enrollment category, fee, guardian, and declaration. After submitting, the applicant is shown the application number and PIN, and pays and checks status from the same page.
 Run migration 028 after 027.
+
+## Admin management (migration 029)
+Admin only, under /api/admin/manage:
+Students: POST /students/:id/update, POST /students/:id/status {status}, POST /students/:id/delete (refused if any invoice, plan, submission or transaction exists; deactivate instead).
+Programmes: GET /programmes, POST /programmes, POST /programmes/:id/update, POST /programmes/:id/active {active}. Names are not changed, since students and fees link by name.
+Fees: GET /fees, POST /fees {programme, registrationFee, tuitionPerSemester}. Applies to invoices created from now on.
+Not yet: payment plan templates, and hiding deactivated programmes from the public list.

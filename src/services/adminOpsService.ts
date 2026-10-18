@@ -25,15 +25,47 @@ function randomDigits(length: number): string {
 
 const DECIDABLE_STATUSES = ["submitted", "under_review"];
 
+/** The applications list used by both the admin app and the web admin page, so they show the same data.
+ *  Each row includes the fee status from the payment records. */
 export async function listApplications() {
   const supabase = getSupabase();
   const { data, error } = await supabase
     .from("applications")
-    .select("id, application_number, full_name, programme, academic_year, status, created_at")
+    .select("id, application_number, full_name, programme, programme_level, academic_year, intake, phone, email, status, rejection_reason, created_at")
     .neq("status", "draft")
     .order("created_at", { ascending: false });
   if (error) throw new Error(`listApplications failed: ${error.message}`);
-  return data || [];
+  const rows = (data || []) as unknown as Record<string, unknown>[];
+  const ids = rows.map((r) => r.id as string);
+  if (ids.length === 0) return rows;
+
+  const { data: payments, error: payError } = await supabase
+    .from("application_payments")
+    .select("id, application_id, status, method, amount, submitted_at")
+    .in("application_id", ids)
+    .order("submitted_at", { ascending: false });
+  if (payError) throw new Error(`listApplications (payments) failed: ${payError.message}`);
+  const byApp = new Map<string, { id: string; status: string; method: string; amount: number }[]>();
+  for (const p of (payments || []) as unknown as { id: string; application_id: string; status: string; method: string; amount: number }[]) {
+    const list = byApp.get(p.application_id) || [];
+    list.push({ id: p.id, status: p.status, method: p.method, amount: p.amount });
+    byApp.set(p.application_id, list);
+  }
+
+  return rows.map((r) => {
+    const list = byApp.get(r.id as string) || [];
+    const verified = list.find((p) => p.status === "verified");
+    const pending = list.find((p) => p.status === "pending");
+    const latest = list[0];
+    const shown = verified || pending || latest;
+    return {
+      ...r,
+      payment_status: verified ? "verified" : pending ? "pending" : latest ? latest.status : "none",
+      payment_method: shown ? shown.method : null,
+      payment_amount: shown ? shown.amount : null,
+      payment_id: pending ? pending.id : null,
+    };
+  });
 }
 
 export async function getApplication(applicationId: string) {
