@@ -1,3 +1,4 @@
+import { streamApplicationForm } from "../services/applicationFormPdfService.js";
 import { streamApplicantLetter } from "../services/applicantLetterService.js";
 import { Router, Request, Response } from "express";
 import { requireAdminAuth, AdminRequest } from "../middleware/adminAuth.js";
@@ -85,4 +86,10 @@ applicationPaymentRouter.post("/portal/letter", rateLimit("app-portal-letter", 2
 applicationPaymentRouter.post("/admin/applications/:id/accept", requireAdminAuth, async (req: AdminRequest, res: Response) => {
   try { res.json(await acceptApplication(req.adminUsername || "admin", req.params.id)); }
   catch (err) { fail(res, err, "Could not accept the application."); }
+});
+
+// Admin: the filled application form as a PDF, for the admission record.
+applicationPaymentRouter.get("/admin/applications/:id/form", requireAdminAuth, async (req: AdminRequest, res: Response) => {
+  try { await streamApplicationForm(req.params.id, res); }
+  catch (err) { if (!res.headersSent) fail(res, err, "Could not create the form."); }
 });

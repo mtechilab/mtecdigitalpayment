@@ -284,7 +284,7 @@
   // The decisions shown for each application. Same rules as the admin app.
   function appActions(a) {
     var awaiting = ["submitted", "under_review", "info_required"].indexOf(a.status) >= 0;
-    var b = "";
+    var b = '<button data-act="form" data-id="' + appEsc(a.id) + '">Form PDF</button> ';
     var pending = a.payment_status === "pending" && a.payment_id;
     if (pending) {
       b += '<button data-act="verify" data-pid="' + appEsc(a.payment_id) + '">Verify fee</button> ';
@@ -318,6 +318,17 @@
     if (!b) return;
     var act = b.dataset.act;
     try {
+      if (act === "form") {
+        const res = await fetch(API + "/api/application-payments/admin/applications/" + b.dataset.id + "/form", { headers: { "Authorization": "Bearer " + token } });
+        if (!res.ok) { const d = await res.json().catch(function () { return {}; }); throw new Error(d.error || "The form could not be downloaded."); }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url; link.download = "MTeC-application-" + b.dataset.id + ".pdf";
+        document.body.appendChild(link); link.click(); link.remove();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+        return;
+      }
       if (act === "verify") {
         if (!confirm("Verify this application fee?")) return;
         await appCall("POST", "/api/application-payments/admin/payments/" + b.dataset.pid + "/review", { decision: "verify" });
