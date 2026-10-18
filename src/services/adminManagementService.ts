@@ -9,7 +9,9 @@ export async function updateStudent(admin: string, studentId: string, fields: {
   const problem = validateStudentUpdate(fields);
   if (problem) throw new Error(problem);
   const supabase = getSupabase();
-  const update: Record<string, string> = {};
+  const update: {
+    full_name?: string; phone?: string; email?: string; level?: string; academic_year?: string; status?: string; programme?: string;
+  } = {};
   if (fields.fullName !== undefined) update.full_name = fields.fullName.trim();
   if (fields.phone !== undefined) update.phone = fields.phone.trim();
   if (fields.email !== undefined) update.email = fields.email.trim();
@@ -85,7 +87,10 @@ export async function updateProgramme(admin: string, id: string, input: {
 }) {
   const problem = validateProgramme({ name: "ok-name", durationYears: input.durationYears, category: input.category, mode: input.mode });
   if (problem) throw new Error(problem);
-  const update: Record<string, unknown> = {};
+  const update: {
+    department?: string; duration_years?: number; duration_label?: string; category?: string; mode?: string;
+    description?: string; intake_label?: string;
+  } = {};
   if (input.department !== undefined) update.department = input.department.trim();
   if (input.durationYears !== undefined) update.duration_years = input.durationYears;
   if (input.durationLabel !== undefined) update.duration_label = input.durationLabel.trim();

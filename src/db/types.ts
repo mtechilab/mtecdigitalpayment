@@ -202,7 +202,7 @@ export interface Database {
         Relationships: [];
       };
       fee_structures: {
-        Row: { programme: string; registration_fee: number; tuition_per_semester: number };
+        Row: { programme: string; registration_fee: number; tuition_per_semester: number; updated_at: string; updated_by: string | null };
         Insert: Partial<Database["public"]["Tables"]["fee_structures"]["Row"]>;
         Update: Partial<Database["public"]["Tables"]["fee_structures"]["Row"]>;
         Relationships: [];
