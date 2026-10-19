@@ -4,7 +4,7 @@ import { requireAdminAuth, AdminRequest } from "../middleware/adminAuth.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 import {
   studentSemesterStatus, submitSemesterPayment, setWindow, listPendingRegistrations, reviewSemesterPayment,
-  assignCourses, registrationReceiptLink,
+  assignCourses, registrationReceiptLink, listWindows,
 } from "../services/semesterRegistrationService.js";
 
 function fail(res: Response, err: unknown, fallback: string) {
@@ -73,4 +73,14 @@ adminSemesterRouter.post("/students/:id/courses", async (req: AdminRequest, res:
     const b = (req.body || {}) as Record<string, unknown>;
     res.json(await assignCourses(req.adminUsername || "admin", req.params.id, String(b.semester || ""), String(b.year || ""), b.courses));
   } catch (err) { fail(res, err, "Could not assign the courses."); }
+});
+
+studentSemesterRouter.get("/windows", async (_req: Request, res: Response) => {
+  try { res.json({ windows: await listWindows() }); }
+  catch (err) { fail(res, err, "Could not load the semesters."); }
+});
+
+adminSemesterRouter.get("/windows", async (_req: AdminRequest, res: Response) => {
+  try { res.json({ windows: await listWindows() }); }
+  catch (err) { fail(res, err, "Could not load the semesters."); }
 });

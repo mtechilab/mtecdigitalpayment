@@ -137,7 +137,7 @@ export async function listPendingRegistrations(semester: string, year: string) {
   return rows.map((r) => {
     const s = byId.get(r.student_row_id);
     return {
-      id: r.id, amountDue: r.amount_due, late: r.late, method: r.payment_method, reference: r.payment_reference,
+      id: r.id, studentRowId: r.student_row_id, amountDue: r.amount_due, late: r.late, method: r.payment_method, reference: r.payment_reference,
       hasReceipt: !!r.receipt_path, submittedAt: r.submitted_at,
       studentId: s?.student_id || "", fullName: s?.full_name || "", programme: s?.programme || "", level: s?.level || "",
     };
@@ -202,4 +202,15 @@ export async function registrationReceiptLink(registrationId: string) {
   const { data: signed, error } = await getSupabase().storage.from(BUCKET).createSignedUrl(path, LINK_SECONDS);
   if (error || !signed) throw new Error(`Could not create the receipt link: ${error?.message || "unknown"}`);
   return { url: signed.signedUrl, expiresInSeconds: LINK_SECONDS };
+}
+
+/** The registration windows, with whether each is open now. Shown to students and admins alike. */
+export async function listWindows() {
+  const { data, error } = await getSupabase().from("semester_windows").select("*").order("opens_at", { ascending: false });
+  if (error) throw new Error(`listWindows failed: ${error.message}`);
+  return ((data || []) as unknown as WindowRow[]).map((w) => ({
+    semester: w.semester_name, academicYear: w.academic_year, state: windowState(toWindow(w)),
+    opensAt: w.opens_at, closesAt: w.closes_at, lateClosesAt: w.late_closes_at,
+    surchargePercent: w.late_surcharge_percent, isOpen: w.is_open,
+  }));
 }
