@@ -357,6 +357,24 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["application_payments"]["Row"]>;
         Relationships: [];
       };
+      semester_windows: {
+        Row: { id: string; semester_name: string; academic_year: string; opens_at: string; closes_at: string; late_closes_at: string | null; late_surcharge_percent: number; is_open: boolean; updated_at: string; updated_by: string | null };
+        Insert: Partial<Database["public"]["Tables"]["semester_windows"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["semester_windows"]["Row"]>;
+        Relationships: [];
+      };
+      student_course_assignments: {
+        Row: { id: string; student_row_id: string; semester_name: string; academic_year: string; course_code: string; course_name: string; assigned_by: string | null; assigned_at: string };
+        Insert: Partial<Database["public"]["Tables"]["student_course_assignments"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["student_course_assignments"]["Row"]>;
+        Relationships: [];
+      };
+      semester_registrations: {
+        Row: { id: string; student_row_id: string; semester_name: string; academic_year: string; status: string; amount_due: number; late: boolean; payment_method: string | null; payment_reference: string | null; receipt_path: string | null; receipt_type: string | null; submitted_at: string | null; reviewed_at: string | null; reviewed_by: string | null; review_reason: string | null; confirmed_at: string | null };
+        Insert: Partial<Database["public"]["Tables"]["semester_registrations"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["semester_registrations"]["Row"]>;
+        Relationships: [];
+      };
       chat_messages: {
         Row: { id: string; student_row_id: string; sender_type: string; sender_name: string; message: string; created_at: string; students?: { student_id: string; full_name: string } | null };
         Insert: Partial<Database["public"]["Tables"]["chat_messages"]["Row"]>;

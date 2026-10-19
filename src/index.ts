@@ -1,3 +1,4 @@
+import { studentSemesterRouter, adminSemesterRouter } from "./routes/semesterRegistrationRoutes.js";
 import { adminManagementRouter } from "./routes/adminManagementRoutes.js";
 import { applicationPaymentRouter } from "./routes/applicationPaymentRoutes.js";
 import { studentCallRouter, staffCallRouter } from "./routes/callRoutes.js";
@@ -56,6 +57,8 @@ app.use("/api/calls/student", studentCallRouter);
 app.use("/api/calls/staff", staffCallRouter);
 app.use("/api/application-payments", applicationPaymentRouter);
 app.use("/api/admin/manage", adminManagementRouter);
+app.use("/api/semester/student", studentSemesterRouter);
+app.use("/api/semester/admin", adminSemesterRouter);
 app.use("/payments", paymentRoutes);
 app.use("/api/staff", staffRoutes);
 app.use("/api/admin", adminRoutes);

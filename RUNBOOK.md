@@ -155,3 +155,9 @@ Not yet: payment plan templates, and hiding deactivated programmes from the publ
 
 ## Student PIN after acceptance (migration 030)
 Accept first (applicant accepted, fee verified), then Generate PIN (approve). The student ID and PIN are created once; the letter shows them; the applicant registers with them. Run migration 030 after 029.
+
+## Semester registration (migration 031)
+Admin opens and closes registration per semester (window with opening date, closing date, optional late deadline, surcharge, open or closed).
+Students register after paying: Orange Money reference or cash receipt. A late registration adds the surcharge (50% by default).
+Admin verifies the payment, which confirms the registration, then assigns the courses. Students see their courses once confirmed.
+Endpoints: /api/semester/student (GET /status, POST /pay), /api/semester/admin (POST /window, GET /pending, GET /registrations/:id/receipt, POST /registrations/:id/review, POST /students/:id/courses).
