@@ -4,7 +4,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import type { Response } from "express";
 import { getSupabase } from "../db/supabaseClient.js";
-import { authenticate } from "./applicationPaymentService.js";
+import { authenticate, ApplicationRow } from "./applicationPaymentService.js";
 import { ORANGE_MONEY_NUMBER } from "./applicationPaymentPolicy.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -18,6 +18,20 @@ const METHOD_LABELS: Record<string, string> = { orange_money: "Orange Money", ca
  *  application number and PIN, and the letter is only available once the application is accepted. */
 export async function streamApplicantLetter(applicationNumber: string, pin: string, res: Response) {
   const app = await authenticate(applicationNumber, pin);
+  return writeLetter(app, res);
+}
+
+/** The admin downloads an applicant's letter directly, without the applicant's PIN. */
+export async function streamAdminLetter(applicationId: string, res: Response) {
+  const { data, error } = await getSupabase().from("applications")
+    .select("id, application_number, status, full_name, programme, programme_level, pin_id, rejection_reason")
+    .eq("id", applicationId).maybeSingle();
+  if (error) throw new Error(`streamAdminLetter failed: ${error.message}`);
+  if (!data) throw new Error("That application was not found.");
+  return writeLetter(data as unknown as ApplicationRow, res);
+}
+
+async function writeLetter(app: ApplicationRow, res: Response) {
   if (app.status !== "accepted" && app.status !== "approved") {
     throw new Error("Your letter is not ready. It is available once your application is accepted.");
   }

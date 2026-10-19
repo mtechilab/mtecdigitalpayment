@@ -1,4 +1,5 @@
 import { streamApplicationForm } from "../services/applicationFormPdfService.js";
+import { streamAdminLetter } from "../services/applicantLetterService.js";
 import { streamApplicantLetter } from "../services/applicantLetterService.js";
 import { Router, Request, Response } from "express";
 import { requireAdminAuth, AdminRequest } from "../middleware/adminAuth.js";
@@ -92,4 +93,10 @@ applicationPaymentRouter.post("/admin/applications/:id/accept", requireAdminAuth
 applicationPaymentRouter.get("/admin/applications/:id/form", requireAdminAuth, async (req: AdminRequest, res: Response) => {
   try { await streamApplicationForm(req.params.id, res); }
   catch (err) { if (!res.headersSent) fail(res, err, "Could not create the form."); }
+});
+
+// Admin: the acceptance letter for any applicant, as a PDF.
+applicationPaymentRouter.get("/admin/applications/:id/letter", requireAdminAuth, async (req: AdminRequest, res: Response) => {
+  try { await streamAdminLetter(req.params.id, res); }
+  catch (err) { if (!res.headersSent) fail(res, err, "Could not create the letter."); }
 });
