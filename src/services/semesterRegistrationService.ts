@@ -214,3 +214,40 @@ export async function listWindows() {
     surchargePercent: w.late_surcharge_percent, isOpen: w.is_open,
   }));
 }
+
+/** Admin: registers a continuing student for a semester, for payments made at the office or by Orange Money.
+ *  The admin has already received the payment, so the registration is confirmed at once. */
+export async function registerContinuingStudent(admin: string, input: {
+  studentId: string; semester: string; year: string; method: unknown; reference?: unknown;
+}) {
+  const supabase = getSupabase();
+  const { data: student } = await supabase.from("students").select("id, status, full_name").eq("student_id", input.studentId.trim()).maybeSingle();
+  const row = student as unknown as { id: string; status: string; full_name: string } | null;
+  if (!row) throw new Error("No student has that student ID.");
+  if (row.status !== "active") throw new Error("This student is not active. Reactivate them first.");
+  const { data: sem } = await supabase.from("semesters").select("name").eq("name", input.semester).maybeSingle();
+  if (!sem) throw new Error("Choose a semester that exists.");
+  const existing = await registrationFor(row.id, input.semester, input.year);
+  if (existing && existing.status === "confirmed") throw new Error("This student is already registered for this semester.");
+  const { tuition } = await tuitionFor(row.id);
+
+  let reference: string | null = null;
+  if (input.method === "orange_money") {
+    const problem = validateReference(input.reference);
+    if (problem) throw new Error(problem);
+    reference = (input.reference as string).trim();
+  } else if (input.method !== "cash") {
+    throw new Error("Choose cash paid at the office, or Orange Money with its reference.");
+  }
+
+  const now = new Date().toISOString();
+  const { error } = await supabase.from("semester_registrations").upsert({
+    student_row_id: row.id, semester_name: input.semester, academic_year: input.year, status: "confirmed",
+    amount_due: tuition, late: false, payment_method: input.method as string, payment_reference: reference,
+    receipt_path: null, receipt_type: null, submitted_at: now, reviewed_at: now, reviewed_by: admin,
+    review_reason: null, confirmed_at: now,
+  }, { onConflict: "student_row_id,semester_name,academic_year" });
+  if (error) throw new Error(`registerContinuingStudent failed: ${error.message}`);
+  await recordAudit({ actor: admin, action: "semester.registration_admin", entityType: "student", entityId: row.id, detail: { semester: input.semester, year: input.year, method: input.method } });
+  return { success: true, status: "confirmed", fullName: row.full_name, amount: tuition };
+}
