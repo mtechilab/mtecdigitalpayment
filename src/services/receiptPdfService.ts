@@ -59,9 +59,15 @@ export async function streamReceiptPdf(studentRowId: string, receiptNumber: stri
   const methodLabel = METHOD_LABELS[r.method] || r.method;
 
   const doc = new PDFDocument({ size: "A4", margin: 0 });
-  res.setHeader("Content-Type", "application/pdf");
-  res.setHeader("Content-Disposition", `inline; filename="${r.receipt_number.replace(/\//g, "-")}.pdf"`);
-  doc.pipe(res);
+  // The PDF is built completely in memory and only then sent, so a failure returns a clear error
+  // instead of a cut-off file that the phone reports as a lost connection.
+  const chunks: Buffer[] = [];
+  doc.on("data", (chunk: Buffer) => chunks.push(chunk));
+  const finished = new Promise<Buffer>((resolve, reject) => {
+    doc.on("end", () => resolve(Buffer.concat(chunks)));
+    doc.on("error", reject);
+  });
+  const fileName = r.receipt_number.replace(/\//g, "-");
   const W = doc.page.width;
   const M = 40;
   const CW = W - M * 2;
@@ -131,4 +137,9 @@ export async function streamReceiptPdf(studentRowId: string, receiptNumber: stri
   doc.fillColor(GOLD).font("Helvetica-Oblique").fontSize(9).text("This is an official receipt from MTeC. Keep it for your records.", M, footerY + 60, { width: CW, align: "center" });
 
   doc.end();
+  const pdf = await finished;
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `inline; filename="${fileName}.pdf"`);
+  res.setHeader("Content-Length", String(pdf.length));
+  res.end(pdf);
 }
