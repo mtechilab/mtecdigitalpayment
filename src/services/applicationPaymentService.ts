@@ -1,5 +1,6 @@
 import { getSupabase } from "../db/supabaseClient.js";
 import { recordAudit } from "./auditLogService.js";
+import { createStudentForApplication } from "./adminOpsService.js";
 import {
   Level, validateLevel, validateReference, validateReceipt, validateFeeAmount, paymentPrecheck, ORANGE_MONEY_NUMBER,
 } from "./applicationPaymentPolicy.js";
@@ -210,8 +211,11 @@ export async function acceptApplication(adminName: string, applicationId: string
   const { data: paid } = await supabase.from("application_payments").select("id")
     .eq("application_id", applicationId).eq("status", "verified").limit(1);
   if (!paid || paid.length === 0) throw new Error("Verify the application fee before accepting this application.");
-  const { error: updateError } = await supabase.from("applications").update({ status: "accepted" }).eq("id", applicationId);
-  if (updateError) throw new Error(`acceptApplication (update) failed: ${updateError.message}`);
-  await recordAudit({ actor: adminName, action: "application.accept", entityType: "application", entityId: applicationId, detail: {} });
-  return { success: true, status: "accepted" };
+  // Accepting creates the student ID and PIN at once, so the acceptance letter carries them.
+  const login = await createStudentForApplication(applicationId, adminName);
+  const { error: updateError } = await supabase.from("applications")
+    .update({ status: "accepted", student_id: login.studentId }).eq("id", applicationId);
+  if (updateError) throw new Error(`acceptApplication (update) failed after the login was created for ${login.studentId}: ${updateError.message}`);
+  await recordAudit({ actor: adminName, action: "application.accept", entityType: "application", entityId: applicationId, detail: { studentId: login.studentId } });
+  return { success: true, status: "accepted", studentId: login.studentId, pin: login.pin };
 }

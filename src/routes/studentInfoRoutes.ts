@@ -118,7 +118,11 @@ router.get("/receipts/:receiptNumber/pdf", async (req: AuthenticatedRequest, res
     await streamReceiptPdf(req.studentRowId as string, req.params.receiptNumber, res);
   } catch (err) {
     console.error("[/student/receipts/pdf] error:", (err as Error).message);
-    if (!res.headersSent) res.status(404).json({ error: (err as Error).message || "Could not generate receipt." });
+    if (!res.headersSent) {
+      const message = (err as Error).message || "Could not generate receipt.";
+      // 404 only when the receipt really is not found for this student; any other failure is a server error.
+      res.status(/not found/i.test(message) ? 404 : 500).json({ error: message });
+    }
     else res.end();
   }
 });

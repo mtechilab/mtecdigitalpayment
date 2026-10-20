@@ -11,6 +11,12 @@ function fail(res: Response, err: unknown, fallback: string) {
   res.status(/not found/i.test(message) ? 404 : /only finance|only administrators/i.test(message) ? 403 : 400).json({ error: message });
 }
 
+/** PDF failures: a 404 only when the receipt is really not found; anything else is a server error. */
+function pdfFail(res: Response, err: unknown) {
+  const message = (err as Error).message || "Could not create the receipt.";
+  res.status(/not found/i.test(message) ? 404 : 500).json({ error: message });
+}
+
 function cashBody(b: Record<string, unknown>) {
   return {
     studentId: String(b.studentId || ""), amount: b.amount, paymentType: String(b.paymentType || "Tuition Fees"),
@@ -46,7 +52,7 @@ staffFinanceRouter.get("/receipts/:receiptNumber/pdf", async (req: Request, res:
     const staff = (req as StaffRequest).staff;
     if (!staff || !canRecordCash(staff.role)) return res.status(403).json({ error: "Only finance officers can view receipts here." });
     await streamReceiptPdf(await receiptOwner(req.params.receiptNumber), req.params.receiptNumber, res);
-  } catch (err) { if (!res.headersSent) fail(res, err, "Could not create the receipt."); }
+  } catch (err) { if (!res.headersSent) pdfFail(res, err); }
 });
 
 /** Administrators record cash the same way. */
@@ -73,7 +79,7 @@ adminFinanceRouter.get("/receipts", async (_req: AdminRequest, res: Response) =>
 });
 adminFinanceRouter.get("/receipts/:receiptNumber/pdf", async (req: AdminRequest, res: Response) => {
   try { await streamReceiptPdf(await receiptOwner(req.params.receiptNumber), req.params.receiptNumber, res); }
-  catch (err) { if (!res.headersSent) fail(res, err, "Could not create the receipt."); }
+  catch (err) { if (!res.headersSent) pdfFail(res, err); }
 });
 
 adminFinanceRouter.get("/cash", async (_req: AdminRequest, res: Response) => {

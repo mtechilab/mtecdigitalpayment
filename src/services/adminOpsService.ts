@@ -149,6 +149,11 @@ export async function approveApplication(applicationId: string, actor: string = 
     throw new Error(`This application is already ${application.status.replace("_", " ")} and can't be re-decided.`);
   }
 
+  // The login is created when the application is accepted. Approving again would create a second student.
+  const { data: existingLogin } = await supabase.from("applications").select("student_id").eq("id", applicationId).maybeSingle();
+  if ((existingLogin as unknown as { student_id: string | null } | null)?.student_id) {
+    throw new Error("The student login was already created for this applicant.");
+  }
   // The student ID and PIN are generated only after the applicant is accepted and the fee is verified.
   if (application.status !== "accepted") {
     throw new Error("Accept the application first. The student PIN is generated after acceptance.");
@@ -1052,4 +1057,35 @@ export async function deleteTimetableSlot(slotId: string) {
   const { error } = await supabase.from("timetable_slots").delete().eq("id", slotId);
   if (error) throw new Error(`deleteTimetableSlot failed: ${error.message}`);
   return { success: true };
+}
+
+/** Creates the student ID, PIN, and student record for an applicant. Called when the application is accepted,
+ *  so the acceptance letter can carry the login. Does not change the application's status. */
+export async function createStudentForApplication(applicationId: string, actor: string) {
+  const supabase = getSupabase();
+  const { data: row, error } = await supabase.from("applications")
+    .select("id, student_id, full_name, phone, email, programme, academic_year").eq("id", applicationId).maybeSingle();
+  if (error) throw new Error(`createStudentForApplication (lookup) failed: ${error.message}`);
+  const application = row as unknown as {
+    id: string; student_id: string | null; full_name: string; phone: string; email: string | null; programme: string; academic_year: string | null;
+  } | null;
+  if (!application) throw new Error("Application not found.");
+  if (application.student_id) throw new Error("The student login was already created for this applicant.");
+
+  const year = application.academic_year || String(new Date().getFullYear());
+  const { count: studentCount } = await supabase.from("students").select("id", { count: "exact", head: true });
+  const seq = String((studentCount || 0) + 1).padStart(5, "0");
+  const studentId = `MTEC-${year}-${seq}`;
+  const pin = randomDigits(6);
+
+  const { data: student, error: studentError } = await supabase.from("students").insert({
+    student_id: studentId, student_pin: pin, application_id: application.id, full_name: application.full_name,
+    phone: application.phone, email: application.email || "", programme: application.programme,
+    academic_year: year, status: "active",
+  }).select("id").single();
+  if (studentError) throw new Error(`createStudentForApplication (student insert) failed: ${studentError.message}`);
+
+  const paymentPlanCreated = await tryCreateDefaultPaymentPlan((student as unknown as { id: string }).id, application.programme);
+  await recordAudit({ actor, action: "application.student_login", entityType: "application", entityId: applicationId, detail: { studentId } });
+  return { studentId, pin, paymentPlanCreated };
 }
