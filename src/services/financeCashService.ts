@@ -29,7 +29,7 @@ export async function lookupStudent(studentId: string) {
  *  student's panel update together. A repeated reference returns the receipt already made, and records nothing new. */
 export async function recordCash(actorName: string, actorUsername: string, role: unknown, input: {
   studentId: string; amount: unknown; paymentType: string; clientReference: unknown;
-  receiptBase64?: unknown; receiptContentType?: unknown;
+  receiptBase64?: unknown; receiptContentType?: unknown; reference?: unknown;
 }) {
   if (!canRecordCash(role)) throw new Error("Only finance officers and administrators can record cash.");
   const amountProblem = validateCashAmount(input.amount);
@@ -44,6 +44,11 @@ export async function recordCash(actorName: string, actorUsername: string, role:
     return { success: true, duplicate: true, receiptNumber: await receiptForReference(ref) };
   }
 
+  // An optional reference code, such as an Orange Money reference or a cash slip number.
+  const referenceText = typeof input.reference === "string" ? input.reference.trim() : "";
+  if (referenceText && !/^[A-Za-z0-9 \/-]{3,40}$/.test(referenceText)) {
+    throw new Error("The reference code must be 3 to 40 letters, numbers, spaces, dashes or slashes.");
+  }
   // A photo of the receipt must be attached before the payment is recorded.
   const photoProblem = validateReceipt(input.receiptContentType, input.receiptBase64);
   if (photoProblem) throw new Error(`Attach a photo of the cash receipt. ${photoProblem}`);
@@ -62,8 +67,9 @@ export async function recordCash(actorName: string, actorUsername: string, role:
 
   const { data: sub, error } = await supabase.from("payment_submissions").insert({
     student_row_id: student.studentRowId, payment_plan_id: planId, amount: input.amount as number,
-    method: "cash", status: "pending", client_reference: ref,
+    method: "cash", status: "pending", client_reference: ref, mtec_reference: ref,
     finance_receipt_path: receiptPath, finance_receipt_type: contentType, finance_recorded_by: actorName,
+    finance_reference: referenceText || null,
   }).select("id").single();
   if (error) {
     await supabase.storage.from(RECEIPT_BUCKET).remove([receiptPath]);
@@ -109,7 +115,7 @@ export async function cashReceiptLink(clientReference: string) {
 export async function listCashRecords(limit: number = 100) {
   const supabase = getSupabase();
   const { data, error } = await supabase.from("payment_submissions")
-    .select("id, client_reference, amount, student_row_id, finance_receipt_path, finance_recorded_by, created_at")
+    .select("id, client_reference, amount, student_row_id, finance_receipt_path, finance_recorded_by, finance_reference, created_at")
     .eq("method", "cash").not("client_reference", "is", null)
     .order("created_at", { ascending: false }).limit(limit);
   if (error) throw new Error(`listCashRecords failed: ${error.message}`);
@@ -127,6 +133,7 @@ export async function listCashRecords(limit: number = 100) {
       reference: r.client_reference, amount: r.amount, studentId: st?.student_id || "", fullName: st?.full_name || "",
       programme: st?.programme || "", recordedBy: r.finance_recorded_by || "", recordedAt: r.created_at,
       hasReceipt: !!r.finance_receipt_path,
+      referenceCode: (r as unknown as { finance_reference: string | null }).finance_reference || "",
     };
   });
 }

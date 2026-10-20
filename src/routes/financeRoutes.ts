@@ -20,7 +20,7 @@ function pdfFail(res: Response, err: unknown) {
 function cashBody(b: Record<string, unknown>) {
   return {
     studentId: String(b.studentId || ""), amount: b.amount, paymentType: String(b.paymentType || "Tuition Fees"),
-    clientReference: b.clientReference, receiptBase64: b.receiptBase64, receiptContentType: b.receiptContentType,
+    clientReference: b.clientReference, receiptBase64: b.receiptBase64, receiptContentType: b.receiptContentType, reference: b.reference,
   };
 }
 
