@@ -135,3 +135,21 @@ export async function setFee(admin: string, programme: string, registration: unk
   await recordAudit({ actor: admin, action: "fee.set", entityType: "fee_structure", entityId: programme, detail: { registration, tuition } });
   return { success: true };
 }
+
+/** Deletes a programme only when no student is on it. Otherwise it must be deactivated, so records are kept.
+ *  The fee structure is removed with it. */
+export async function deleteProgramme(admin: string, id: string) {
+  const supabase = getSupabase();
+  const { data: prog, error: readError } = await supabase.from("programmes").select("id, name").eq("id", id).maybeSingle();
+  if (readError) throw new Error(`deleteProgramme failed: ${readError.message}`);
+  const row = prog as unknown as { id: string; name: string } | null;
+  if (!row) throw new Error("That programme was not found.");
+  const { count, error: countError } = await supabase.from("students").select("id", { count: "exact", head: true }).eq("programme", row.name);
+  if (countError) throw new Error("Could not check the programme. Try again.");
+  if ((count ?? 0) > 0) throw new Error("This programme has students, so it cannot be deleted. Deactivate it instead.");
+  const { error } = await supabase.from("programmes").delete().eq("id", id);
+  if (error) throw new Error("This programme is in use, so it cannot be deleted. Deactivate it instead.");
+  await supabase.from("fee_structures").delete().eq("programme", row.name);
+  await recordAudit({ actor: admin, action: "programme.delete", entityType: "programme", entityId: id, detail: { name: row.name } });
+  return { success: true };
+}

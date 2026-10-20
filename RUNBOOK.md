@@ -161,3 +161,11 @@ Admin opens and closes registration per semester (window with opening date, clos
 Students register after paying: Orange Money reference or cash receipt. A late registration adds the surcharge (50% by default).
 Admin verifies the payment, which confirms the registration, then assigns the courses. Students see their courses once confirmed.
 Endpoints: /api/semester/student (GET /status, POST /pay), /api/semester/admin (POST /window, GET /pending, GET /registrations/:id/receipt, POST /registrations/:id/review, POST /students/:id/courses).
+
+## Finance cash recording (migration 032)
+Finance officers (staff role "finance") and administrators record cash taken at the office. Each payment carries a client reference, so an offline sync sent twice is recorded once. Cash is confirmed through the same step as an approved payment, so balances and the student's panel update together. The student must already have a payment plan.
+Endpoints: /api/finance/staff and /api/finance/admin: GET /students/lookup?studentId=, POST /cash {studentId, amount, paymentType, clientReference}.
+Known limit: receipts record cash as "bank" because the shared finalize step maps every non-Monime method to bank. Fix that in the finalize step before cash receipts are issued.
+
+## Cash receipt photo (migration 033)
+Every cash payment recorded by finance needs a receipt photo (JPG, PNG or WEBP, up to 5 MB). It is stored privately. Admins open it with GET /api/finance/admin/cash/:clientReference/receipt.

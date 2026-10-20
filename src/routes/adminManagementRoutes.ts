@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { requireAdminAuth, AdminRequest } from "../middleware/adminAuth.js";
 import {
-  updateStudent, deleteStudent, listProgrammes, addProgramme, updateProgramme, setProgrammeActive, listFees, setFee,
+  updateStudent, deleteStudent, listProgrammes, addProgramme, updateProgramme, setProgrammeActive, listFees, setFee, deleteProgramme,
 } from "../services/adminManagementService.js";
 
 function fail(res: Response, err: unknown, fallback: string) {
@@ -44,6 +44,11 @@ adminManagementRouter.post("/programmes", async (req: AdminRequest, res: Respons
 adminManagementRouter.post("/programmes/:id/update", async (req: AdminRequest, res: Response) => {
   try { res.json(await updateProgramme(actor(req), req.params.id, req.body || {})); }
   catch (err) { fail(res, err, "Could not update the programme."); }
+});
+
+adminManagementRouter.post("/programmes/:id/delete", async (req: AdminRequest, res: Response) => {
+  try { res.json(await deleteProgramme(actor(req), req.params.id)); }
+  catch (err) { fail(res, err, "Could not delete the programme."); }
 });
 
 adminManagementRouter.post("/programmes/:id/active", async (req: AdminRequest, res: Response) => {
