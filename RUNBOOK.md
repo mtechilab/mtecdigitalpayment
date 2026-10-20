@@ -182,3 +182,7 @@ Admins publish news and notices for everyone or for one programme, with an optio
 Student: GET /api/news/student/feed, POST /api/news/student/feed/:id/read.
 Admin: GET /api/news/admin/posts, POST /api/news/admin/posts, POST /api/news/admin/posts/:id/delete, POST /api/admin/manage/programmes/:id/thumbnail {imageBase64, imageType}.
 Images are stored privately and returned as links that last one hour.
+
+## Programme catalogue (public and admin)
+Public: GET /api/programmes/catalogue returns active programmes with thumbnail links, duration, category, mode, the semester fee and the registration fee.
+Admin: GET /api/admin/manage/catalogue returns every programme, including inactive ones.

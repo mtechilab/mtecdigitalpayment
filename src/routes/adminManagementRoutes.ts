@@ -1,3 +1,4 @@
+import { adminCatalogue } from "../services/catalogueService.js";
 import { setProgrammeThumbnail } from "../services/newsService.js";
 import { Router, Request, Response } from "express";
 import { requireAdminAuth, AdminRequest } from "../middleware/adminAuth.js";
@@ -78,4 +79,9 @@ adminManagementRouter.post("/programmes/:id/thumbnail", async (req: AdminRequest
     const b = (req.body || {}) as Record<string, unknown>;
     res.json(await setProgrammeThumbnail(actor(req), req.params.id, b.imageBase64, b.imageType));
   } catch (err) { fail(res, err, "Could not save the thumbnail."); }
+});
+
+adminManagementRouter.get("/catalogue", async (_req: AdminRequest, res: Response) => {
+  try { res.json({ programmes: await adminCatalogue() }); }
+  catch (err) { fail(res, err, "Could not load the programmes."); }
 });
