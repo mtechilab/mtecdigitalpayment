@@ -15,7 +15,7 @@ export interface Database {
     Tables: {
       programmes: {
         Row: {
-          id: string; active: boolean; name: string; department: string; duration_years: number; duration_label: string;
+          id: string; thumbnail_type: string | null; thumbnail_path: string | null; active: boolean; name: string; department: string; duration_years: number; duration_label: string;
           category: string; mode: string; description: string; intake_label: string;
         };
         Insert: Partial<Database["public"]["Tables"]["programmes"]["Row"]>;
@@ -373,6 +373,18 @@ export interface Database {
         Row: { id: string; student_row_id: string; semester_name: string; academic_year: string; status: string; amount_due: number; late: boolean; payment_method: string | null; payment_reference: string | null; receipt_path: string | null; receipt_type: string | null; submitted_at: string | null; reviewed_at: string | null; reviewed_by: string | null; review_reason: string | null; confirmed_at: string | null };
         Insert: Partial<Database["public"]["Tables"]["semester_registrations"]["Row"]>;
         Update: Partial<Database["public"]["Tables"]["semester_registrations"]["Row"]>;
+        Relationships: [];
+      };
+      news_posts: {
+        Row: { id: string; kind: string; title: string; body: string; audience: string; image_path: string | null; image_type: string | null; published_at: string; expires_at: string | null; author: string; created_at: string };
+        Insert: Partial<Database["public"]["Tables"]["news_posts"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["news_posts"]["Row"]>;
+        Relationships: [];
+      };
+      news_reads: {
+        Row: { post_id: string; student_row_id: string; read_at: string };
+        Insert: Partial<Database["public"]["Tables"]["news_reads"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["news_reads"]["Row"]>;
         Relationships: [];
       };
       chat_messages: {
