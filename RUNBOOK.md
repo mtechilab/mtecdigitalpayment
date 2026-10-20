@@ -186,3 +186,6 @@ Images are stored privately and returned as links that last one hour.
 ## Programme catalogue (public and admin)
 Public: GET /api/programmes/catalogue returns active programmes with thumbnail links, duration, category, mode, the semester fee and the registration fee.
 Admin: GET /api/admin/manage/catalogue returns every programme, including inactive ones.
+
+## Cash payment method (migration 037)
+Adds "cash" to the allowed payment methods on payment_submissions. Before running it, check the methods already in use with: select distinct method from payment_submissions;
