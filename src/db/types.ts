@@ -62,7 +62,7 @@ export interface Database {
       };
       payment_submissions: {
         Row: {
-          finance_receipt_type: string | null; finance_receipt_path: string | null; client_reference: string | null; proof_path: string | null;
+          finance_recorded_by: string | null; finance_receipt_type: string | null; finance_receipt_path: string | null; client_reference: string | null; proof_path: string | null;
           proof_uploaded_at: string | null;
           monime_order_number: string | null;
           monime_payload: unknown | null;

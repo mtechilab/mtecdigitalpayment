@@ -169,3 +169,10 @@ Known limit: receipts record cash as "bank" because the shared finalize step map
 
 ## Cash receipt photo (migration 033)
 Every cash payment recorded by finance needs a receipt photo (JPG, PNG or WEBP, up to 5 MB). It is stored privately. Admins open it with GET /api/finance/admin/cash/:clientReference/receipt.
+
+## Receipts everywhere
+Every confirmed payment creates a receipt automatically (online, approved bank or mobile money, and finance cash).
+Student: GET /api/student/receipts and GET /api/student/receipts/:receiptNumber/pdf.
+Finance officers: GET /api/finance/staff/receipts and GET /api/finance/staff/receipts/:receiptNumber/pdf.
+Administrators: GET /api/finance/admin/receipts and GET /api/finance/admin/receipts/:receiptNumber/pdf.
+Known limit: cash receipts show method "bank", because the shared finalize step maps non-Monime payments to bank.

@@ -63,7 +63,7 @@ export async function recordCash(actorName: string, actorUsername: string, role:
   const { data: sub, error } = await supabase.from("payment_submissions").insert({
     student_row_id: student.studentRowId, payment_plan_id: planId, amount: input.amount as number,
     method: "cash", status: "pending", client_reference: ref,
-    finance_receipt_path: receiptPath, finance_receipt_type: contentType,
+    finance_receipt_path: receiptPath, finance_receipt_type: contentType, finance_recorded_by: actorName,
   }).select("id").single();
   if (error) {
     await supabase.storage.from(RECEIPT_BUCKET).remove([receiptPath]);
@@ -103,4 +103,30 @@ export async function cashReceiptLink(clientReference: string) {
   const { data: signed, error } = await getSupabase().storage.from(RECEIPT_BUCKET).createSignedUrl(path, LINK_SECONDS);
   if (error || !signed) throw new Error(`Could not create the link: ${error?.message || "unknown"}`);
   return { url: signed.signedUrl, expiresInSeconds: LINK_SECONDS };
+}
+
+/** The cash recorded by finance officers, newest first, for administrators to review. */
+export async function listCashRecords(limit: number = 100) {
+  const supabase = getSupabase();
+  const { data, error } = await supabase.from("payment_submissions")
+    .select("id, client_reference, amount, student_row_id, finance_receipt_path, finance_recorded_by, created_at")
+    .eq("method", "cash").not("client_reference", "is", null)
+    .order("created_at", { ascending: false }).limit(limit);
+  if (error) throw new Error(`listCashRecords failed: ${error.message}`);
+  const rows = (data || []) as unknown as {
+    client_reference: string; amount: number; student_row_id: string; finance_receipt_path: string | null; finance_recorded_by: string | null; created_at: string;
+  }[];
+  if (rows.length === 0) return [];
+  const ids = [...new Set(rows.map((r) => r.student_row_id))];
+  const { data: students } = await supabase.from("students").select("id, student_id, full_name, programme").in("id", ids);
+  const byId = new Map(((students || []) as unknown as { id: string; student_id: string; full_name: string; programme: string }[])
+    .map((s) => [s.id, s]));
+  return rows.map((r) => {
+    const st = byId.get(r.student_row_id);
+    return {
+      reference: r.client_reference, amount: r.amount, studentId: st?.student_id || "", fullName: st?.full_name || "",
+      programme: st?.programme || "", recordedBy: r.finance_recorded_by || "", recordedAt: r.created_at,
+      hasReceipt: !!r.finance_receipt_path,
+    };
+  });
 }

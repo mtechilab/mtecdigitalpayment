@@ -1,7 +1,10 @@
+import { listAllReceipts, receiptOwner } from "../services/financeReceiptsService.js";
+import { canRecordCash } from "../services/financeCashPolicy.js";
+import { streamReceiptPdf } from "../services/receiptPdfService.js";
 import { Router, Request, Response } from "express";
 import { requireStaffAuth, StaffRequest } from "../middleware/staffAuth.js";
 import { requireAdminAuth, AdminRequest } from "../middleware/adminAuth.js";
-import { lookupStudent, recordCash, cashReceiptLink } from "../services/financeCashService.js";
+import { lookupStudent, recordCash, cashReceiptLink, listCashRecords } from "../services/financeCashService.js";
 
 function fail(res: Response, err: unknown, fallback: string) {
   const message = (err as Error).message || fallback;
@@ -30,6 +33,22 @@ staffFinanceRouter.post("/cash", async (req: Request, res: Response) => {
   } catch (err) { fail(res, err, "Could not record the payment."); }
 });
 
+/** Every receipt, with a PDF for each, for finance officers (and administrators). */
+staffFinanceRouter.get("/receipts", async (req: Request, res: Response) => {
+  try {
+    const staff = (req as StaffRequest).staff;
+    if (!staff || !canRecordCash(staff.role)) return res.status(403).json({ error: "Only finance officers can view receipts here." });
+    res.json({ receipts: await listAllReceipts() });
+  } catch (err) { fail(res, err, "Could not load the receipts."); }
+});
+staffFinanceRouter.get("/receipts/:receiptNumber/pdf", async (req: Request, res: Response) => {
+  try {
+    const staff = (req as StaffRequest).staff;
+    if (!staff || !canRecordCash(staff.role)) return res.status(403).json({ error: "Only finance officers can view receipts here." });
+    await streamReceiptPdf(await receiptOwner(req.params.receiptNumber), req.params.receiptNumber, res);
+  } catch (err) { if (!res.headersSent) fail(res, err, "Could not create the receipt."); }
+});
+
 /** Administrators record cash the same way. */
 export const adminFinanceRouter = Router();
 adminFinanceRouter.use(requireAdminAuth);
@@ -46,4 +65,18 @@ adminFinanceRouter.post("/cash", async (req: AdminRequest, res: Response) => {
 adminFinanceRouter.get("/cash/:clientReference/receipt", async (req: AdminRequest, res: Response) => {
   try { res.json(await cashReceiptLink(req.params.clientReference)); }
   catch (err) { fail(res, err, "Could not open the receipt photo."); }
+});
+
+adminFinanceRouter.get("/receipts", async (_req: AdminRequest, res: Response) => {
+  try { res.json({ receipts: await listAllReceipts() }); }
+  catch (err) { fail(res, err, "Could not load the receipts."); }
+});
+adminFinanceRouter.get("/receipts/:receiptNumber/pdf", async (req: AdminRequest, res: Response) => {
+  try { await streamReceiptPdf(await receiptOwner(req.params.receiptNumber), req.params.receiptNumber, res); }
+  catch (err) { if (!res.headersSent) fail(res, err, "Could not create the receipt."); }
+});
+
+adminFinanceRouter.get("/cash", async (_req: AdminRequest, res: Response) => {
+  try { res.json({ records: await listCashRecords() }); }
+  catch (err) { fail(res, err, "Could not load the cash records."); }
 });
