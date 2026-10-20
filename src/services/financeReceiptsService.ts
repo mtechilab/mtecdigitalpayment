@@ -13,15 +13,15 @@ export async function listAllReceipts(limit: number = 200) {
   }[];
   if (rows.length === 0) return [];
   const ids = [...new Set(rows.map((r) => r.student_row_id))];
-  const { data: students } = await supabase.from("students").select("id, student_id, full_name, programme").in("id", ids);
-  const byId = new Map(((students || []) as unknown as { id: string; student_id: string; full_name: string; programme: string }[])
+  const { data: students } = await supabase.from("students").select("id, student_id, full_name, programme, phone").in("id", ids);
+  const byId = new Map(((students || []) as unknown as { id: string; student_id: string; full_name: string; programme: string; phone: string }[])
     .map((s) => [s.id, s]));
   return rows.map((r) => {
     const st = byId.get(r.student_row_id);
     return {
       receipt_number: r.receipt_number, amount: r.amount, method: r.method, date: r.date, received_by: r.received_by,
       previous_balance: r.previous_balance, new_balance: r.new_balance,
-      student_id: st?.student_id || "", student_name: st?.full_name || "", programme: st?.programme || "",
+      student_id: st?.student_id || "", student_name: st?.full_name || "", programme: st?.programme || "", student_phone: st?.phone || "",
     };
   });
 }
