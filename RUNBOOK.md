@@ -176,3 +176,9 @@ Student: GET /api/student/receipts and GET /api/student/receipts/:receiptNumber/
 Finance officers: GET /api/finance/staff/receipts and GET /api/finance/staff/receipts/:receiptNumber/pdf.
 Administrators: GET /api/finance/admin/receipts and GET /api/finance/admin/receipts/:receiptNumber/pdf.
 Known limit: cash receipts show method "bank", because the shared finalize step maps non-Monime payments to bank.
+
+## News, notices, and programme thumbnails (migration 036)
+Admins publish news and notices for everyone or for one programme, with an optional image and an expiry date. Students see the posts meant for them, with an unread count, and mark them read.
+Student: GET /api/news/student/feed, POST /api/news/student/feed/:id/read.
+Admin: GET /api/news/admin/posts, POST /api/news/admin/posts, POST /api/news/admin/posts/:id/delete, POST /api/admin/manage/programmes/:id/thumbnail {imageBase64, imageType}.
+Images are stored privately and returned as links that last one hour.

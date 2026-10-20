@@ -1,3 +1,4 @@
+import { setProgrammeThumbnail } from "../services/newsService.js";
 import { Router, Request, Response } from "express";
 import { requireAdminAuth, AdminRequest } from "../middleware/adminAuth.js";
 import {
@@ -70,4 +71,11 @@ adminManagementRouter.post("/fees", async (req: AdminRequest, res: Response) => 
     if (typeof programme !== "string") return res.status(400).json({ error: "Choose a programme." });
     res.json(await setFee(actor(req), programme, registrationFee, tuitionPerSemester));
   } catch (err) { fail(res, err, "Could not update the fee."); }
+});
+
+adminManagementRouter.post("/programmes/:id/thumbnail", async (req: AdminRequest, res: Response) => {
+  try {
+    const b = (req.body || {}) as Record<string, unknown>;
+    res.json(await setProgrammeThumbnail(actor(req), req.params.id, b.imageBase64, b.imageType));
+  } catch (err) { fail(res, err, "Could not save the thumbnail."); }
 });
