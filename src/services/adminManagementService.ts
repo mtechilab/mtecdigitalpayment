@@ -1,6 +1,6 @@
 import { getSupabase } from "../db/supabaseClient.js";
 import { recordAudit } from "./auditLogService.js";
-import { validateStudentUpdate, validateProgramme, validateFees, canDeleteStudent } from "./adminManagementPolicy.js";
+import { validateStudentUpdate, validateProgramme, validateFees, canDeleteStudent, validateDuration, yearsEquivalent } from "./adminManagementPolicy.js";
 
 /** Student details the admin may change. The programme, if changed, must be an active programme. */
 export async function updateStudent(admin: string, studentId: string, fields: {
@@ -66,40 +66,57 @@ export async function listProgrammes() {
   return data || [];
 }
 
+type DurationInput = { courseType?: string; durationValue?: number; durationUnit?: string };
+
+/** Adds a programme with its course type and duration. Older callers that send durationYears still work. */
 export async function addProgramme(admin: string, input: {
-  name: string; department?: string; durationYears?: number; durationLabel?: string; category?: string; mode?: string; description?: string; intakeLabel?: string;
-}) {
+  name: string; department?: string; durationYears?: number; category?: string; mode?: string; description?: string; intakeLabel?: string;
+} & DurationInput) {
   const problem = validateProgramme(input);
   if (problem) throw new Error(problem);
+  const courseType = input.courseType ?? "diploma";
+  const durationUnit = input.durationUnit ?? "years";
+  const durationValue = input.durationValue ?? input.durationYears ?? 1;
+  const durationProblem = validateDuration(courseType, durationValue, durationUnit);
+  if (durationProblem) throw new Error(durationProblem);
   const { data, error } = await getSupabase().from("programmes").insert({
-    name: input.name.trim(), department: (input.department || "").trim(), duration_years: input.durationYears ?? 1,
-    duration_label: (input.durationLabel || "").trim(), category: (input.category || "").trim(), mode: (input.mode || "").trim(),
+    name: input.name.trim(), department: (input.department || "").trim(),
+    duration_years: yearsEquivalent(durationValue, durationUnit), duration_label: "",
+    category: (input.category || "").trim(), mode: (input.mode || "").trim(),
     description: (input.description || "").trim(), intake_label: (input.intakeLabel || "").trim(), active: true,
+    course_type: courseType, duration_value: durationValue, duration_unit: durationUnit,
   }).select("id").single();
   if (error) throw new Error(`addProgramme failed: ${error.message}`);
   await recordAudit({ actor: admin, action: "programme.add", entityType: "programme", entityId: (data as { id: string }).id, detail: { name: input.name } });
   return { id: (data as { id: string }).id };
 }
 
-/** Changing a programme's name is not allowed, since students and fees are linked to it by name. */
+/** Changes a programme's details, course type, and duration. The name cannot be changed. */
 export async function updateProgramme(admin: string, id: string, input: {
-  department?: string; durationYears?: number; durationLabel?: string; category?: string; mode?: string; description?: string; intakeLabel?: string;
-}) {
-  const problem = validateProgramme({ name: "ok-name", durationYears: input.durationYears, category: input.category, mode: input.mode });
-  if (problem) throw new Error(problem);
-  const update: {
-    department?: string; duration_years?: number; duration_label?: string; category?: string; mode?: string;
-    description?: string; intake_label?: string;
-  } = {};
+  department?: string; category?: string; mode?: string; description?: string; intakeLabel?: string;
+} & DurationInput) {
+  const supabase = getSupabase();
+  const update: Record<string, unknown> = {};
   if (input.department !== undefined) update.department = input.department.trim();
-  if (input.durationYears !== undefined) update.duration_years = input.durationYears;
-  if (input.durationLabel !== undefined) update.duration_label = input.durationLabel.trim();
   if (input.category !== undefined) update.category = input.category.trim();
   if (input.mode !== undefined) update.mode = input.mode.trim();
   if (input.description !== undefined) update.description = input.description.trim();
   if (input.intakeLabel !== undefined) update.intake_label = input.intakeLabel.trim();
+  if (input.courseType !== undefined || input.durationValue !== undefined || input.durationUnit !== undefined) {
+    const { data: current } = await supabase.from("programmes").select("course_type, duration_value, duration_unit").eq("id", id).maybeSingle();
+    const now = (current || {}) as unknown as { course_type: string | null; duration_value: number | null; duration_unit: string | null };
+    const courseType = input.courseType ?? now.course_type ?? "diploma";
+    const durationUnit = input.durationUnit ?? now.duration_unit ?? "years";
+    const durationValue = input.durationValue ?? now.duration_value ?? 1;
+    const durationProblem = validateDuration(courseType, durationValue, durationUnit);
+    if (durationProblem) throw new Error(durationProblem);
+    update.course_type = courseType;
+    update.duration_value = durationValue;
+    update.duration_unit = durationUnit;
+    update.duration_years = yearsEquivalent(durationValue, durationUnit);
+  }
   if (Object.keys(update).length === 0) throw new Error("Nothing to change.");
-  const { error } = await getSupabase().from("programmes").update(update).eq("id", id);
+  const { error } = await supabase.from("programmes").update(update).eq("id", id);
   if (error) throw new Error(`updateProgramme failed: ${error.message}`);
   await recordAudit({ actor: admin, action: "programme.update", entityType: "programme", entityId: id, detail: { fields: Object.keys(update) } });
   return { success: true };

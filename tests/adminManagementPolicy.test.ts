@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { validateStudentUpdate, validateProgramme, validateFees, canDeleteStudent } from "../src/services/adminManagementPolicy.ts";
+import { validateStudentUpdate, validateProgramme, validateFees, canDeleteStudent, validateDuration, yearsEquivalent } from "../src/services/adminManagementPolicy.ts";
 
 test("student changes are checked field by field", () => {
   assert.equal(validateStudentUpdate({ fullName: "Musa Bah Sesay" }), null);
@@ -31,4 +31,16 @@ test("a student is deleted only when every related count is zero, and any unknow
   assert.equal(canDeleteStudent([0, 1, 0, 0]), false);
   assert.equal(canDeleteStudent([0, null, 0, 0]), false);
   assert.equal(canDeleteStudent([]), false);
+});
+
+test("a programme has a course type and a duration that can be edited in months or years", () => {
+  assert.equal(validateDuration("certificate", 6, "months"), null);
+  assert.equal(validateDuration("diploma", 2, "years"), null);
+  assert.equal(validateDuration("short_course", 3, "years"), null);
+  assert.notEqual(validateDuration("degree", 2, "years"), null);
+  assert.notEqual(validateDuration("certificate", 0, "months"), null);
+  assert.notEqual(validateDuration("certificate", 1.5, "months"), null);
+  assert.notEqual(validateDuration("diploma", 11, "years"), null);
+  assert.equal(yearsEquivalent(24, "months"), 2);
+  assert.equal(yearsEquivalent(2, "years"), 2);
 });

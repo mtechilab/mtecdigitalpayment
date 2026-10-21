@@ -15,7 +15,7 @@ export interface Database {
     Tables: {
       programmes: {
         Row: {
-          id: string; thumbnail_type: string | null; thumbnail_path: string | null; active: boolean; name: string; department: string; duration_years: number; duration_label: string;
+          id: string; duration_unit: string | null; duration_value: number | null; course_type: string | null; thumbnail_type: string | null; thumbnail_path: string | null; active: boolean; name: string; department: string; duration_years: number; duration_label: string;
           category: string; mode: string; description: string; intake_label: string;
         };
         Insert: Partial<Database["public"]["Tables"]["programmes"]["Row"]>;

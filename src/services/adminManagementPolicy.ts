@@ -29,3 +29,22 @@ export function validateFees(registration: unknown, tuition: unknown): string | 
 export function canDeleteStudent(counts: (number | null)[]): boolean {
   return counts.length > 0 && counts.every((c) => c === 0);
 }
+
+export const COURSE_TYPES = ["short_course", "certificate", "diploma"] as const;
+export const DURATION_UNITS = ["months", "years"] as const;
+
+/** The course type and duration. Both can be edited by the admin, so any unit is allowed for any type. */
+export function validateDuration(courseType: unknown, value: unknown, unit: unknown): string | null {
+  if (!(COURSE_TYPES as readonly string[]).includes(courseType as string)) return "Choose Short course, Certificate or Diploma.";
+  if (!(DURATION_UNITS as readonly string[]).includes(unit as string)) return "The duration unit must be months or years.";
+  const max = unit === "months" ? 60 : 10;
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > max) {
+    return `The duration must be a whole number from 1 to ${max} ${unit}.`;
+  }
+  return null;
+}
+
+/** The yearly equivalent, kept for older screens that still read duration_years. */
+export function yearsEquivalent(value: number, unit: string): number {
+  return unit === "years" ? value : Math.max(1, Math.round(value / 12));
+}
