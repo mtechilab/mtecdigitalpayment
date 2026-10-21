@@ -96,7 +96,10 @@ export async function updateProgramme(admin: string, id: string, input: {
   department?: string; category?: string; mode?: string; description?: string; intakeLabel?: string;
 } & DurationInput) {
   const supabase = getSupabase();
-  const update: Record<string, unknown> = {};
+  const update: {
+    department?: string; category?: string; mode?: string; description?: string; intake_label?: string;
+    course_type?: string; duration_value?: number; duration_unit?: string; duration_years?: number;
+  } = {};
   if (input.department !== undefined) update.department = input.department.trim();
   if (input.category !== undefined) update.category = input.category.trim();
   if (input.mode !== undefined) update.mode = input.mode.trim();
