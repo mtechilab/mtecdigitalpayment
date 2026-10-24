@@ -1,4 +1,5 @@
 import { listAllReceipts, receiptOwner } from "../services/financeReceiptsService.js";
+import { recordOpeningBalance } from "../services/openingBalanceService.js";
 import { canRecordCash } from "../services/financeCashPolicy.js";
 import { streamReceiptPdf } from "../services/receiptPdfService.js";
 import { Router, Request, Response } from "express";
@@ -85,4 +86,14 @@ adminFinanceRouter.get("/receipts/:receiptNumber/pdf", async (req: AdminRequest,
 adminFinanceRouter.get("/cash", async (_req: AdminRequest, res: Response) => {
   try { res.json({ records: await listCashRecords() }); }
   catch (err) { fail(res, err, "Could not load the cash records."); }
+});
+
+/** Administrators enter a continuing student's total fee and the amount already paid. */
+adminFinanceRouter.post("/opening-balance", async (req: AdminRequest, res: Response) => {
+  try {
+    const b = (req.body || {}) as Record<string, unknown>;
+    res.json(await recordOpeningBalance(req.adminUsername || "admin", {
+      studentId: b.studentId, totalFee: b.totalFee, amountPaid: b.amountPaid, reason: b.reason,
+    }));
+  } catch (err) { fail(res, err, "Could not record the opening balance."); }
 });
