@@ -10,7 +10,7 @@ const CREST_PATH = path.join(__dirname, "..", "..", "assets", "mtec-crest.png");
 /** Standard 4.0-scale classification. Not specified anywhere else in the
  *  system — a reasonable default banding, easy to change in one place if
  *  the college has an official policy that differs. */
-function classifyAward(gpa: number): string {
+export function classifyAward(gpa: number): string {
   if (gpa >= 3.6) return "DISTINCTION";
   if (gpa >= 3.0) return "MERIT";
   if (gpa >= 2.0) return "PASS";

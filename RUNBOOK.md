@@ -189,3 +189,16 @@ Admin: GET /api/admin/manage/catalogue returns every programme, including inacti
 
 ## Cash payment method (migration 037)
 Adds "cash" to the allowed payment methods on payment_submissions. Before running it, check the methods already in use with: select distinct method from payment_submissions;
+
+## Word documents: result slips and master gradesheet
+Students: GET /api/documents/student/result-slip.docx (their own slip).
+Admins: GET /api/admin/documents/students/:id/result-slip.docx and GET /api/admin/documents/gradesheet.docx?programme=NAME.
+Corrections: marks can be fixed in the data editor (table marks, field score). Regenerate the document afterwards. Only published results appear.
+
+## Results administration (migration 040)
+Students cannot download any Word file. Only admins can.
+Official copies: admins upload a PDF or scan (up to 5 MB) per student and semester. Students download their own copies that are still on the statement.
+Removing a copy hides it from the statement, keeps the file and the record, and requires a reason. Restoring puts it back.
+Publish and unpublish: admins publish or unpublish a class's results with a reason. Unpublished results do not show to students.
+Admin: POST /api/admin/results/slips, GET /api/admin/results/slips?studentRowId=, GET /api/admin/results/slips/:id/link, POST /slips/:id/remove, POST /slips/:id/restore, POST /batches/:classId/publish, POST /batches/:classId/unpublish.
+Student: GET /api/results/student/slips, GET /api/results/student/slips/:id/link.

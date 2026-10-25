@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { allowedFields, validateReason } from "../src/services/adminDataPolicy.ts";
+import { allowedFields, validateReason, parseCsv, toCsv } from "../src/services/adminDataPolicy.ts";
 
 test("only the fields a table allows can be changed", () => {
   assert.equal(allowedFields("students", { phone: "0770000000" }).ok, true);
@@ -14,4 +14,10 @@ test("the change log needs a real reason", () => {
   assert.equal(validateReason("Typing error in surname"), null);
   assert.notEqual(validateReason("ok"), null);
   assert.notEqual(validateReason(""), null);
+});
+
+test("CSV reads quoted commas and line breaks, and writes them back safely", () => {
+  const rows = parseCsv('name,phone\n"Musa, Bah",076\n"A ""quoted"" name",\n');
+  assert.deepEqual(rows, [["name", "phone"], ["Musa, Bah", "076"], ['A "quoted" name', ""]]);
+  assert.equal(toCsv(["name"], [{ name: 'a,"b"' }]), 'name\n"a,""b"""');
 });

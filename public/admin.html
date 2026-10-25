@@ -167,6 +167,7 @@
       <div class="panel">
         <h3>Recent Applications <a href="#" onclick="return false;">View all →</a></h3>
         <div id="applicationsList"></div>
+        <div id="resultsAdmin" style="margin-top:20px"></div>
         <h3>All applications</h3>
         <div id="allApplications"></div>
       </div>
@@ -354,7 +355,202 @@
     }
   }
 
+  // ---- Results: official copies, Word documents, remove/restore, publish/unpublish ----
+  function rEl(tag, text, attrs) {
+    var e = document.createElement(tag);
+    if (text !== undefined && text !== null) e.textContent = text;
+    if (attrs) Object.keys(attrs).forEach(function (k) { e.setAttribute(k, attrs[k]); });
+    return e;
+  }
+  function rBtn(label, onClick) {
+    var b = rEl("button", label);
+    b.style.marginRight = "6px";
+    b.addEventListener("click", onClick);
+    return b;
+  }
+  function rCall(method, path, body) {
+    var opts = { method: method, headers: { "Authorization": "Bearer " + token } };
+    if (body) { opts.headers["Content-Type"] = "application/json"; opts.body = JSON.stringify(body); }
+    return fetch(API + path, opts).then(function (res) {
+      return res.json().catch(function () { return {}; }).then(function (data) {
+        if (!res.ok) throw new Error(data.error || "The request was refused.");
+        return data;
+      });
+    });
+  }
+  function rDownload(path, fileName) {
+    return fetch(API + path, { headers: { "Authorization": "Bearer " + token } }).then(function (res) {
+      if (!res.ok) return res.json().catch(function () { return {}; }).then(function (d) { throw new Error(d.error || "The file could not be downloaded."); });
+      return res.blob().then(function (blob) {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url; a.download = fileName;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+      });
+    });
+  }
+  function rReadBase64(file) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function () { resolve(String(reader.result).split(",")[1]); };
+      reader.onerror = function () { reject(new Error("The file could not be read.")); };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function renderResultsAdmin() {
+    var box = document.getElementById("resultsAdmin");
+    if (!box || box.dataset.ready || !token) return;
+    box.dataset.ready = "1";
+    var state = { studentRowId: "", studentName: "" };
+    var msg = rEl("div", "", { style: "margin:8px 0;color:#555" });
+
+    box.appendChild(rEl("h3", "Results"));
+    var card = rEl("div", "", { style: "background:#fff;border:1px solid #d7e2f0;border-radius:8px;padding:14px;margin-bottom:14px" });
+    card.appendChild(rEl("strong", "1. Find the student"));
+    var idInput = rEl("input", "", { placeholder: "Student ID, e.g. MTEC-2026-00056", style: "margin:6px 6px 6px 0;padding:6px;width:260px" });
+    var who = rEl("div", "No student chosen.", { style: "margin:6px 0;color:#333" });
+    card.appendChild(idInput);
+    card.appendChild(rBtn("Find", function () {
+      rCall("GET", "/api/admin/data/students?q=" + encodeURIComponent(idInput.value.trim()) + "&limit=5").then(function (d) {
+        var rows = d.rows || [];
+        var hit = rows.filter(function (r) { return r.student_id === idInput.value.trim(); })[0] || rows[0];
+        if (!hit) throw new Error("No student matches that ID.");
+        state.studentRowId = hit.id; state.studentName = hit.full_name;
+        who.textContent = hit.full_name + "  ·  " + hit.student_id + "  ·  " + hit.programme;
+        loadSlips();
+      }).catch(function (e) { msg.textContent = e.message; });
+    }));
+    card.appendChild(who);
+    box.appendChild(card);
+
+    var copies = rEl("div", "", { style: "background:#fff;border:1px solid #d7e2f0;border-radius:8px;padding:14px;margin-bottom:14px" });
+    copies.appendChild(rEl("strong", "2. Official copies"));
+    var copyList = rEl("div", "Choose a student first.", { style: "margin-top:8px" });
+    copies.appendChild(copyList);
+    var semIn = rEl("input", "", { placeholder: "Semester, e.g. Semester 1", style: "margin:6px 6px 6px 0;padding:6px;width:180px" });
+    var yearIn = rEl("input", "", { placeholder: "Year, e.g. 2026/2027", style: "margin:6px 6px 6px 0;padding:6px;width:150px" });
+    var fileIn = rEl("input", "", { type: "file", accept: "application/pdf,image/jpeg,image/png,image/webp", style: "margin:6px 6px 6px 0" });
+    copies.appendChild(rEl("div", "Upload a new official copy (PDF or image, up to 5 MB):"));
+    copies.appendChild(semIn); copies.appendChild(yearIn); copies.appendChild(fileIn);
+    copies.appendChild(rBtn("Upload official copy", function () {
+      if (!state.studentRowId) { msg.textContent = "Find a student first."; return; }
+      var file = fileIn.files[0];
+      if (!file) { msg.textContent = "Choose a file."; return; }
+      rReadBase64(file).then(function (b64) {
+        return rCall("POST", "/api/admin/results/slips", {
+          studentRowId: state.studentRowId, semester: semIn.value.trim(), academicYear: yearIn.value.trim(),
+          contentType: file.type, fileBase64: b64,
+        });
+      }).then(function () { msg.textContent = "Official copy uploaded."; loadSlips(); })
+        .catch(function (e) { msg.textContent = e.message; });
+    }));
+    box.appendChild(copies);
+
+    function loadSlips() {
+      if (!state.studentRowId) return;
+      rCall("GET", "/api/admin/results/slips?studentRowId=" + encodeURIComponent(state.studentRowId)).then(function (d) {
+        copyList.innerHTML = "";
+        var slips = d.slips || [];
+        if (slips.length === 0) { copyList.textContent = "No official copies yet."; return; }
+        slips.forEach(function (s) {
+          var row = rEl("div", s.semester_name + "  ·  " + s.academic_year + "  ·  " + (s.removed ? "REMOVED: " + (s.removed_reason || "") : "on statement"), { style: "padding:6px 0;border-bottom:1px solid #eee" });
+          row.appendChild(rBtn("Open", function () {
+            rCall("GET", "/api/admin/results/slips/" + s.id + "/link").then(function (l) { window.open(l.url, "_blank"); })
+              .catch(function (e) { msg.textContent = e.message; });
+          }));
+          if (s.removed) {
+            row.appendChild(rBtn("Restore", function () {
+              var why = prompt("Reason for restoring this copy:");
+              if (!why) return;
+              rCall("POST", "/api/admin/results/slips/" + s.id + "/restore", { reason: why }).then(loadSlips)
+                .catch(function (e) { msg.textContent = e.message; });
+            }));
+          } else {
+            row.appendChild(rBtn("Remove from statement", function () {
+              var why = prompt("Reason for removing this copy (kept in the record):");
+              if (!why) return;
+              rCall("POST", "/api/admin/results/slips/" + s.id + "/remove", { reason: why }).then(loadSlips)
+                .catch(function (e) { msg.textContent = e.message; });
+            }));
+          }
+          copyList.appendChild(row);
+        });
+      }).catch(function (e) { msg.textContent = e.message; });
+    }
+
+    var docs = rEl("div", "", { style: "background:#fff;border:1px solid #d7e2f0;border-radius:8px;padding:14px;margin-bottom:14px" });
+    docs.appendChild(rEl("strong", "3. Word documents (admin only)"));
+    docs.appendChild(rEl("div", "", { style: "margin-top:6px" })).appendChild(rBtn("Download result slip (Word)", function () {
+      if (!state.studentRowId) { msg.textContent = "Find a student first."; return; }
+      rDownload("/api/admin/documents/students/" + state.studentRowId + "/result-slip.docx", "result-slip.docx")
+        .catch(function (e) { msg.textContent = e.message; });
+    }));
+    var progIn = rEl("input", "", { placeholder: "Programme name, exactly as in the programme list", style: "margin:6px 6px 6px 0;padding:6px;width:340px" });
+    docs.appendChild(progIn);
+    docs.appendChild(rBtn("Download master gradesheet (Word)", function () {
+      var p = progIn.value.trim();
+      if (!p) { msg.textContent = "Enter the programme name."; return; }
+      rDownload("/api/admin/documents/gradesheet.docx?programme=" + encodeURIComponent(p), "master-gradesheet.docx")
+        .catch(function (e) { msg.textContent = e.message; });
+    }));
+    box.appendChild(docs);
+
+    var pub = rEl("div", "", { style: "background:#fff;border:1px solid #d7e2f0;border-radius:8px;padding:14px;margin-bottom:14px" });
+    pub.appendChild(rEl("strong", "4. Publish results"));
+    pub.appendChild(rEl("div", "Unpublished results are hidden from students and do not count toward CGPA.", { style: "color:#555;margin:4px 0" }));
+    var classIn = rEl("input", "", { placeholder: "Class ID", style: "margin:6px 6px 6px 0;padding:6px;width:260px" });
+    var reasonIn = rEl("input", "", { placeholder: "Reason (required)", style: "margin:6px 6px 6px 0;padding:6px;width:260px" });
+    pub.appendChild(classIn); pub.appendChild(reasonIn);
+    pub.appendChild(rBtn("Publish", function () {
+      rCall("POST", "/api/admin/results/batches/" + encodeURIComponent(classIn.value.trim()) + "/publish", { reason: reasonIn.value.trim() })
+        .then(function () { msg.textContent = "Published."; }).catch(function (e) { msg.textContent = e.message; });
+    }));
+    pub.appendChild(rBtn("Unpublish", function () {
+      rCall("POST", "/api/admin/results/batches/" + encodeURIComponent(classIn.value.trim()) + "/unpublish", { reason: reasonIn.value.trim() })
+        .then(function () { msg.textContent = "Unpublished."; }).catch(function (e) { msg.textContent = e.message; });
+    }));
+    box.appendChild(pub);
+    var courseCard = rEl("div", "", { style: "background:#fff;border:1px solid #d7e2f0;border-radius:8px;padding:14px;margin-bottom:14px" });
+    courseCard.appendChild(rEl("strong", "5. Courses"));
+    courseCard.appendChild(rEl("div", "Correct a course's code or name, or delete it. A course that still has classes or marks cannot be deleted: merge it into the correct course first.", { style: "color:#555;margin:4px 0" }));
+    var courseSearch = rEl("input", "", { placeholder: "Search by course code or name", style: "margin:6px 6px 6px 0;padding:6px;width:260px" });
+    courseCard.appendChild(courseSearch);
+    var courseList = rEl("div", "", { style: "margin-top:8px" });
+    courseCard.appendChild(courseList);
+    function loadCourses() {
+      rCall("GET", "/api/admin/data/courses?q=" + encodeURIComponent(courseSearch.value.trim()) + "&limit=50").then(function (d) {
+        courseList.innerHTML = "";
+        var rows = d.rows || [];
+        if (rows.length === 0) { courseList.textContent = "No courses match."; return; }
+        rows.forEach(function (c) {
+          var row = rEl("div", c.code + "  ·  " + c.name + "  ·  " + (c.programme || "") + " " + (c.semester || ""), { style: "padding:6px 0;border-bottom:1px solid #eee" });
+          row.appendChild(rBtn("Edit", function () {
+            var code = prompt("Course code:", c.code); if (code === null) return;
+            var name = prompt("Course name:", c.name); if (name === null) return;
+            var why = prompt("Reason for the change (kept in the log):"); if (!why) return;
+            rCall("POST", "/api/admin/data/courses/" + c.id + "/update", { fields: { code: code.trim(), name: name.trim() }, reason: why })
+              .then(function () { msg.textContent = "Course updated."; loadCourses(); })
+              .catch(function (e) { msg.textContent = e.message; });
+          }));
+          row.appendChild(rBtn("Delete", function () {
+            var why = prompt("Reason for deleting " + c.code + " (kept in the log):"); if (!why) return;
+            rCall("POST", "/api/admin/data/courses/" + c.id + "/delete", { reason: why })
+              .then(function () { msg.textContent = "Course deleted."; loadCourses(); })
+              .catch(function (e) { msg.textContent = e.message; });
+          }));
+          courseList.appendChild(row);
+        });
+      }).catch(function (e) { msg.textContent = e.message; });
+    }
+    courseCard.appendChild(rBtn("Search courses", loadCourses));
+    box.appendChild(courseCard);
+    box.appendChild(msg);
+  }
+
   function renderDashboard(d) {
+    renderResultsAdmin();
     loadAllApplications();
     if (!window.__appsTimer) window.__appsTimer = setInterval(loadAllApplications, 30000);
     document.getElementById("statStudents").textContent = d.totalStudents;

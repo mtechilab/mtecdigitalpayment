@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { requireAdminAuth, AdminRequest } from "../middleware/adminAuth.js";
 import {
-  listTables, listRows, getRow, createRow, updateRow, deactivateRow, deleteRow, changeLog,
+  listTables, listRows, getRow, createRow, updateRow, deactivateRow, deleteRow, changeLog, exportCsv, previewImport, commitImport,
 } from "../services/adminDataService.js";
 
 function fail(res: Response, err: unknown) {
@@ -21,6 +21,29 @@ adminDataRouter.get("/log", async (req: AdminRequest, res: Response) => {
     const table = typeof req.query.table === "string" ? req.query.table : undefined;
     const key = typeof req.query.key === "string" ? req.query.key : undefined;
     res.json({ entries: await changeLog(table, key, Number(req.query.limit) || 100) });
+  } catch (err) { fail(res, err); }
+});
+
+adminDataRouter.get("/:table/export", async (req: AdminRequest, res: Response) => {
+  try {
+    const csv = await exportCsv(req.params.table);
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${req.params.table}.csv"`);
+    res.send(csv);
+  } catch (err) { fail(res, err); }
+});
+
+adminDataRouter.post("/:table/import/preview", async (req: AdminRequest, res: Response) => {
+  try {
+    const b = (req.body || {}) as { csv?: string; mapping?: Record<string, string> };
+    res.json(await previewImport(req.params.table, b.csv || "", b.mapping || {}));
+  } catch (err) { fail(res, err); }
+});
+
+adminDataRouter.post("/:table/import/commit", async (req: AdminRequest, res: Response) => {
+  try {
+    const b = (req.body || {}) as { csv?: string; mapping?: Record<string, string>; reason?: unknown };
+    res.json(await commitImport(actor(req), req.params.table, b.csv || "", b.mapping || {}, b.reason));
   } catch (err) { fail(res, err); }
 });
 

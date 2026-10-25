@@ -1,3 +1,5 @@
+import { adminResultsRouter, studentResultsRouter } from "./routes/officialResultRoutes.js";
+import { adminDocsRouter } from "./routes/resultDocxRoutes.js";
 import { adminDataRouter } from "./routes/adminDataRoutes.js";
 import { publicCatalogueRouter } from "./routes/catalogueRoutes.js";
 import { studentNewsRouter, adminNewsRouter } from "./routes/newsRoutes.js";
@@ -69,6 +71,9 @@ app.use("/api/news/student", studentNewsRouter);
 app.use("/api/news/admin", adminNewsRouter);
 app.use("/api/programmes/catalogue", publicCatalogueRouter);
 app.use("/api/admin/data", adminDataRouter);
+app.use("/api/admin/documents", adminDocsRouter);
+app.use("/api/admin/results", adminResultsRouter);
+app.use("/api/results/student", studentResultsRouter);
 app.use("/payments", paymentRoutes);
 app.use("/api/staff", staffRoutes);
 app.use("/api/admin", adminRoutes);

@@ -387,6 +387,12 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["news_reads"]["Row"]>;
         Relationships: [];
       };
+      official_result_slips: {
+        Row: { id: string; student_row_id: string; semester_name: string; academic_year: string; file_path: string; file_type: string; uploaded_by: string; uploaded_at: string; removed: boolean; removed_by: string | null; removed_at: string | null; removed_reason: string | null };
+        Insert: Partial<Database["public"]["Tables"]["official_result_slips"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["official_result_slips"]["Row"]>;
+        Relationships: [];
+      };
       chat_messages: {
         Row: { id: string; student_row_id: string; sender_type: string; sender_name: string; message: string; created_at: string; students?: { student_id: string; full_name: string } | null };
         Insert: Partial<Database["public"]["Tables"]["chat_messages"]["Row"]>;
