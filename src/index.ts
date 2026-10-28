@@ -1,3 +1,4 @@
+import { staffProjectRouter, studentProjectRouter } from "./routes/projectRoutes.js";
 import { adminResultsRouter, studentResultsRouter } from "./routes/officialResultRoutes.js";
 import { adminDocsRouter } from "./routes/resultDocxRoutes.js";
 import { adminDataRouter } from "./routes/adminDataRoutes.js";
@@ -73,6 +74,8 @@ app.use("/api/programmes/catalogue", publicCatalogueRouter);
 app.use("/api/admin/data", adminDataRouter);
 app.use("/api/admin/documents", adminDocsRouter);
 app.use("/api/admin/results", adminResultsRouter);
+app.use("/api/projects/staff", staffProjectRouter);
+app.use("/api/projects/student", studentProjectRouter);
 app.use("/api/results/student", studentResultsRouter);
 app.use("/payments", paymentRoutes);
 app.use("/api/staff", staffRoutes);

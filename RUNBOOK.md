@@ -202,3 +202,13 @@ Removing a copy hides it from the statement, keeps the file and the record, and 
 Publish and unpublish: admins publish or unpublish a class's results with a reason. Unpublished results do not show to students.
 Admin: POST /api/admin/results/slips, GET /api/admin/results/slips?studentRowId=, GET /api/admin/results/slips/:id/link, POST /slips/:id/remove, POST /slips/:id/restore, POST /batches/:classId/publish, POST /batches/:classId/unpublish.
 Student: GET /api/results/student/slips, GET /api/results/student/slips/:id/link.
+
+## Group projects and weekly check-ins (migration 041)
+Lecturers and administrators create projects (a lecturer owns the projects they create). Each project gets six milestones. Lecturers assign students. Students save a draft or submit a check-in for a week; a submission needs all four answers and cannot be overwritten. A repeated save with the same reference is treated as one save.
+Staff: POST /api/projects/staff, POST /:id/update, POST /:id/students, GET /:id/checkins. Student: GET /api/projects/student/mine, POST /api/projects/student/checkins.
+Not yet: the student app screen, offline SQLite drafts, attachments, lecturer feedback, admin overview.
+
+## Check-in evidence (migration 042)
+Students attach a photo (JPG, PNG, WEBP) or a PDF, up to 5 MB, to their own draft. The app sends a fixed reference per file, so a retry cannot create a duplicate. The reply comes only after the file is stored.
+Student: POST /api/projects/student/checkins/:id/attachments, GET /api/projects/student/checkins/:id/attachments, GET /api/projects/student/attachments/:id/link.
+Staff: GET /api/projects/staff/attachments/:id/link, for submitted check-ins on projects the staff member owns.

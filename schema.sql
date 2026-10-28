@@ -1,21 +1,17 @@
 
 
--- Official result copies (migration 040)
--- Official result copies uploaded by the admin. Removing one hides it from the statement and keeps the record with its reason.
-create table if not exists official_result_slips (
-  id uuid primary key default gen_random_uuid(),
+-- Check-in evidence (migration 042)
+-- Evidence attached to a weekly check-in: photos and PDFs, stored privately.
+create table if not exists project_checkin_attachments (
+  id uuid primary key,
+  checkin_id uuid not null references project_checkins(id) on delete cascade,
   student_row_id uuid not null references students(id) on delete cascade,
-  semester_name text not null,
-  academic_year text not null,
   file_path text not null,
   file_type text not null,
-  uploaded_by text not null,
-  uploaded_at timestamptz not null default now(),
-  removed boolean not null default false,
-  removed_by text,
-  removed_at timestamptz,
-  removed_reason text
+  size_bytes int not null,
+  original_name text,
+  uploaded_at timestamptz not null default now()
 );
-create index if not exists idx_official_result_slips_student on official_result_slips (student_row_id);
-alter table official_result_slips enable row level security;
-insert into storage.buckets (id, name, public) values ('official-results', 'official-results', false) on conflict (id) do nothing;
+create index if not exists idx_checkin_attachments_checkin on project_checkin_attachments (checkin_id);
+alter table project_checkin_attachments enable row level security;
+insert into storage.buckets (id, name, public) values ('checkin-evidence', 'checkin-evidence', false) on conflict (id) do nothing;
