@@ -1,3 +1,5 @@
+import { resetStudentPin } from "../services/studentPinService.js";
+import { adjustPaymentPlan } from "../services/paymentPlanAdjustService.js";
 import { updateStaffAccount, deleteStaffAccount } from "../services/staffAccountService.js";
 import { recordAudit } from "../services/auditLogService.js";
 import { createStaffAccount, listStaffAccounts, setStaffAccountActive } from "../services/staffAccountService.js";
@@ -202,21 +204,57 @@ router.post("/students", requireAdminAuth, async (req: AdminRequest, res: Respon
   }
 });
 
+// POST /admin/students/:id/payment-plan/adjust — change an active plan's total, and optionally the amount paid.
+// POST /admin/students/:id/reset-pin: give a student a new PIN. The new PIN is returned once.
+router.post("/students/:id/reset-pin", requireAdminAuth, async (req: Request, res: Response) => {
+  try {
+    const { reason } = (req.body || {}) as { reason?: unknown };
+    const actor = (req as AdminRequest).adminUsername || "admin";
+    res.json(await resetStudentPin(actor, req.params.id, reason));
+  } catch (err) {
+    const message = (err as Error).message || "The PIN could not be reset.";
+    res.status(/not found/i.test(message) ? 404 : 400).json({ error: message });
+  }
+});
+
+router.post("/students/:id/payment-plan/adjust", requireAdminAuth, async (req: Request, res: Response) => {
+  try {
+    const { totalAmount, amountPaid, reason } = (req.body || {}) as { totalAmount?: unknown; amountPaid?: unknown; reason?: unknown };
+    const actor = (req as AdminRequest).adminUsername || "admin";
+    res.json(await adjustPaymentPlan(actor, req.params.id, { totalAmount, amountPaid, reason }));
+  } catch (err) {
+    const message = (err as Error).message || "The plan could not be changed.";
+    res.status(/not found|no active/i.test(message) ? 404 : 400).json({ error: message });
+  }
+});
+
 // POST /admin/students/:id/payment-plan — { label, frequency, totalAmount, periodCount, startDate }
 router.post("/students/:id/payment-plan", requireAdminAuth, async (req: Request, res: Response) => {
   try {
-    const { label, frequency, totalAmount, periodCount, startDate, programmeName } = req.body as {
+    const { label, frequency, totalAmount, periodCount, startDate, programmeName, amountPaid, reason } = req.body as {
       label?: string; frequency?: string; totalAmount?: number; periodCount?: number; startDate?: string; programmeName?: string;
+      amountPaid?: number; reason?: string;
     };
     if (!label || !frequency || !totalAmount || !periodCount || !startDate) {
       return res.status(400).json({ error: "label, frequency, totalAmount, periodCount, and startDate are all required." });
     }
-    if (!["daily", "weekly", "monthly", "semester"].includes(frequency)) {
+    if (!["daily", "weekly", "monthly", "semester", "yearly"].includes(frequency)) {
       return res.status(400).json({ error: "frequency must be one of: daily, weekly, monthly, semester." });
+    }
+    const total = Number(totalAmount);
+    const paid = amountPaid === undefined || amountPaid === null || (amountPaid as unknown) === "" ? 0 : Number(amountPaid);
+    if (!Number.isFinite(total) || total <= 0 || total > 100000) {
+      return res.status(400).json({ error: "The total fee must be more than 0, and at most 100000." });
+    }
+    if (!Number.isFinite(paid) || paid < 0 || paid > total) {
+      return res.status(400).json({ error: "The amount already paid must be 0 or more, and no more than the total fee." });
+    }
+    if (typeof reason !== "string" || reason.trim().length < 5) {
+      return res.status(400).json({ error: "Give a reason of at least 5 characters (for example: scholarship, approved by the finance office)." });
     }
     const result = await createPaymentPlanForStudent({
       studentRowId: req.params.id, label, frequency: frequency as any, programmeName,
-      totalAmount: Number(totalAmount), periodCount: Number(periodCount), startDate,
+      totalAmount: total, periodCount: Number(periodCount), startDate, amountPaid: paid, reason: reason.trim(),
     });
     res.json({ success: true, ...result });
   } catch (err) {

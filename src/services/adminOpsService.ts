@@ -364,6 +364,8 @@ export interface CreatePaymentPlanInput {
   totalAmount: number;
   periodCount: number;
   startDate: string; // YYYY-MM-DD
+  amountPaid?: number; // already paid before the plan was entered (for example a scholarship or an earlier payment)
+  reason?: string;     // required on the form; written to the audit log
 }
 
 export async function createPaymentPlanForStudent(input: CreatePaymentPlanInput) {
@@ -437,7 +439,25 @@ export async function createPaymentPlanForStudent(input: CreatePaymentPlanInput)
   const { error: periodsError } = await supabase.from("payment_periods").insert(periods);
   if (periodsError) throw new Error(`createPaymentPlanForStudent (periods) failed: ${periodsError.message}`);
 
-  return { planId: plan.id, periodCount: periods.length };
+  // The amount already paid is applied to the earliest periods, so the balance is correct from the start.
+  const paid = Math.min(Math.max(Number(input.amountPaid) || 0, 0), input.totalAmount);
+  let remaining = paid;
+  for (const period of periods) {
+    const pay = Math.min(remaining, period.amount_due);
+    if (pay > 0) {
+      const { error: payErr } = await supabase.from("payment_periods").update({ amount_paid: Math.round(pay * 100) / 100 })
+        .eq("payment_plan_id", plan.id).eq("period_index", period.period_index);
+      if (payErr) throw new Error(`createPaymentPlanForStudent (paid amount) failed: ${payErr.message}`);
+    }
+    remaining = Math.round((remaining - pay) * 100) / 100;
+  }
+
+  await recordAudit({ actor: "admin", action: "student.payment_plan", entityType: "student", entityId: input.studentRowId, detail: {
+    total: input.totalAmount, amountPaid: paid, balance: Math.round((input.totalAmount - paid) * 100) / 100,
+    frequency: input.frequency, periods: input.periodCount, reason: input.reason || null,
+  } });
+  return { planId: plan.id, periodCount: periods.length, totalAmount: input.totalAmount, amountPaid: paid,
+    balance: Math.round((input.totalAmount - paid) * 100) / 100 };
 }
 
 function periodLabel(frequency: string, index: number, dueDate: Date): string {
