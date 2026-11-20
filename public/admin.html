@@ -534,6 +534,18 @@
               .then(function () { msg.textContent = "Course updated."; loadCourses(); })
               .catch(function (e) { msg.textContent = e.message; });
           }));
+          row.appendChild(rBtn("Merge into another course", function () {
+            var keepCode = prompt("Code of the course to KEEP (" + c.code + " will be merged into it and removed):");
+            if (!keepCode) return;
+            var why = prompt("Reason for the merge (kept in the log):"); if (!why) return;
+            rCall("GET", "/api/admin/data/courses?q=" + encodeURIComponent(keepCode.trim()) + "&limit=5").then(function (d) {
+              var target = (d.rows || []).filter(function (r) { return r.code === keepCode.trim(); })[0];
+              if (!target) throw new Error("No course has the code " + keepCode.trim() + ".");
+              if (target.id === c.id) throw new Error("Choose a different course to keep.");
+              return rCall("POST", "/api/admin/data/courses/" + c.id + "/merge", { intoId: target.id, reason: why });
+            }).then(function (r) { msg.textContent = "Merged. " + (r.merged ? r.merged.code + " was removed into " + r.merged.into + "." : ""); loadCourses(); })
+              .catch(function (e) { msg.textContent = e.message; });
+          }));
           row.appendChild(rBtn("Delete", function () {
             var why = prompt("Reason for deleting " + c.code + " (kept in the log):"); if (!why) return;
             rCall("POST", "/api/admin/data/courses/" + c.id + "/delete", { reason: why })

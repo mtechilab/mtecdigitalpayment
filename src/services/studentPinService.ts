@@ -14,7 +14,9 @@ export async function resetStudentPin(admin: string, studentRowId: string, reaso
   if (!student) throw new Error("Student not found.");
   const s = student as unknown as { id: string; student_id: string; full_name: string; status: string };
   const pin = String(randomInt(100000, 1000000));
-  const { error } = await supabase.from("students").update({ student_pin: pin }).eq("id", studentRowId);
+  // The PIN only works while first login is not complete. Reopening first login lets the student use the new PIN once,
+  // and then choose their own password, as on a new account.
+  const { error } = await supabase.from("students").update({ student_pin: pin, first_login_complete: false }).eq("id", studentRowId);
   if (error) throw new Error(`The PIN could not be reset: ${error.message}`);
   await recordAudit({ actor: admin, action: "student.pin_reset", entityType: "student", entityId: studentRowId,
     detail: { reason: String(reason).trim() } });

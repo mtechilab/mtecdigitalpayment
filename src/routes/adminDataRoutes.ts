@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import { requireAdminAuth, AdminRequest } from "../middleware/adminAuth.js";
+import { mergeCourses } from "../services/courseMergeService.js";
 import {
   listTables, listRows, getRow, createRow, updateRow, deactivateRow, deleteRow, changeLog, exportCsv, previewImport, commitImport,
 } from "../services/adminDataService.js";
@@ -76,6 +77,13 @@ adminDataRouter.post("/:table/:key/update", async (req: AdminRequest, res: Respo
 adminDataRouter.post("/:table/:key/deactivate", async (req: AdminRequest, res: Response) => {
   try { res.json({ row: await deactivateRow(actor(req), req.params.table, req.params.key, body(req).reason) }); }
   catch (err) { fail(res, err); }
+});
+
+adminDataRouter.post("/courses/:key/merge", async (req: AdminRequest, res: Response) => {
+  try {
+    const b = (req.body || {}) as { intoId?: string; reason?: unknown };
+    res.json(await mergeCourses(actor(req), req.params.key, String(b.intoId || ""), b.reason));
+  } catch (err) { fail(res, err); }
 });
 
 adminDataRouter.post("/:table/:key/delete", async (req: AdminRequest, res: Response) => {
