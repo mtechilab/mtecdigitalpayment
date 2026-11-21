@@ -8,7 +8,12 @@ export async function mergeCourses(admin: string, fromId: string, intoId: string
   if (reasonProblem) throw new Error(reasonProblem);
   if (!fromId || !intoId) throw new Error("Choose the duplicate course and the course to keep.");
   if (fromId === intoId) throw new Error("Choose two different courses.");
-  const supabase = getSupabase();
+  // The merge function and the change log are not in the generated database types, so calls use a loose type.
+  // The names are fixed in this file.
+  const supabase = getSupabase() as unknown as {
+    from(table: string): any;
+    rpc(fn: string, args: Record<string, unknown>): any;
+  };
   const { data: both, error: lookErr } = await supabase.from("courses").select("id, code, name").in("id", [fromId, intoId]);
   if (lookErr) throw new Error(`Could not load the courses: ${lookErr.message}`);
   if (!both || both.length !== 2) throw new Error("One of the courses was not found.");
